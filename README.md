@@ -186,6 +186,9 @@ SkillPool 默认按这些原则运行：
 - `docs/MAINTAINER_GUIDE.zh-CN.md`
   面向开发维护者
 
+- `docs/MAINTENANCE_DOSSIER.zh-CN.md`
+  面向后来人接手维护的完整总手册，第一次接手建议先读这一份
+
 - `docs/SYNC_GUIDE.zh-CN.md`
   专门说明同步中心与批量装载/禁用逻辑
 

@@ -1,5 +1,9 @@
 # SkillPool 维护者指南
 
+如果你需要一份更完整的接手文档，请先读：
+
+- `docs/MAINTENANCE_DOSSIER.zh-CN.md`
+
 ## 1. 当前工程边界
 
 SkillPool 当前是：

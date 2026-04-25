@@ -243,5 +243,6 @@ python skillpool.py discovery refresh --summary
 - `README.md`
 - `docs/OPERATIONS_MANUAL.zh-CN.md`
 - `docs/MAINTAINER_GUIDE.zh-CN.md`
+- `docs/MAINTENANCE_DOSSIER.zh-CN.md`
 - `docs/SYNC_GUIDE.zh-CN.md`
 - `docs/FEATURES.zh-CN.md`
