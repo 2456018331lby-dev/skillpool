@@ -1,0 +1,21 @@
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local runtime data
+backups/
+cache/
+pool/
+publish/
+reports/
+state/
+
+# Local planning / scratch files
+findings.md
+progress.md
+task_plan.md
+
+# Logs
+*.log
