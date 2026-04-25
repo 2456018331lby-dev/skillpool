@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SkillPool 控制台</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail" aria-label="SkillPool 分区导航">
+        <div class="brand">
+          <span class="brand-mark">SP</span>
+          <div>
+            <strong>SkillPool</strong>
+            <small>本地控制台</small>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-link" data-view="dashboard">总览</button>
+          <button class="nav-link" data-view="clients">客户端</button>
+          <button class="nav-link" data-view="mcp">MCP</button>
+          <button class="nav-link" data-view="inventory">盘点</button>
+          <button class="nav-link" data-view="cleanup">清理</button>
+          <button class="nav-link active" data-view="skills">技能池</button>
+          <button class="nav-link" data-view="sync">同步中心</button>
+          <button class="nav-link" data-view="conflicts">冲突</button>
+          <button class="nav-link" data-view="import">导入</button>
+          <button class="nav-link" data-view="reports">报告</button>
+        </nav>
+        <div class="rail-note">
+          <span>仅本机访问</span>
+          <strong>127.0.0.1</strong>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="service-strip" id="serviceStrip">
+          <div class="service-strip-main">
+            <strong id="serviceState">检测中</strong>
+            <span id="serviceHint">正在检查本地 SkillPool 服务状态。</span>
+          </div>
+          <div class="service-strip-actions">
+            <code>open-console.cmd</code>
+            <code>console-status.cmd</code>
+            <code>stop-console.cmd</code>
+          </div>
+        </section>
+
+        <section class="service-banner hidden" id="serviceBanner">
+          <strong>本地服务未连接。</strong>
+          <span>请运行 <code>%USERPROFILE%\.skill-pool\open-console.cmd</code> 启动服务，或用 <code>console-status.cmd</code> 查看状态、<code>stop-console.cmd</code> 关闭服务。离线时会保留当前只读内容，但会禁用需要后端的操作。</span>
+        </section>
+
+        <header class="hero">
+          <div>
+            <p class="eyebrow">统一技能管理</p>
+            <h1>一个主池，六个客户端，所有操作可回滚。</h1>
+          </div>
+          <div class="hero-actions">
+            <div id="serviceBadge"></div>
+            <button class="button ghost" id="refreshAll" data-online-required="1">刷新</button>
+            <button class="button primary" id="previewAll" data-online-required="1">全部预览</button>
+          </div>
+        </header>
+
+        <section class="view" id="view-dashboard">
+          <div class="stat-grid" id="summaryStats"></div>
+          <div class="dashboard-grid">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">控制中心</p>
+                  <h2>快捷动作</h2>
+                </div>
+              </div>
+              <div id="quickActionList" class="command-list"></div>
+            </div>
+            <aside class="panel command-detail-panel">
+              <div class="panel-head slim">
+                <div>
+                  <p class="eyebrow">功能介绍</p>
+                  <h2 id="quickActionTitle">请选择一个动作</h2>
+                </div>
+                <div id="quickActionBadges" class="badge-row"></div>
+              </div>
+              <p id="quickActionDescription" class="muted">这里会显示当前动作的说明、命令预览和执行结果。</p>
+              <div class="command-preview-block">
+                <small>命令预览</small>
+                <code id="quickActionCommand">-</code>
+              </div>
+              <div class="action-row">
+                <button class="button primary" id="runQuickAction" data-online-required="1" disabled>立即执行</button>
+                <button class="button ghost" id="copyQuickActionCommand">复制命令</button>
+              </div>
+              <pre class="codebox smallbox" id="quickActionOutput">执行结果会显示在这里。</pre>
+            </aside>
+          </div>
+          <div class="dashboard-grid">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">桌面入口</p>
+                  <h2>启动与关闭</h2>
+                </div>
+              </div>
+              <div id="systemSummary" class="system-grid"></div>
+              <div id="manualCommandList" class="manual-command-list"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">统一跳转</p>
+                  <h2>客户端总览</h2>
+                </div>
+              </div>
+              <div class="client-grid" id="clientCards"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">客户端状态</p>
+                <h2>当前纳管情况</h2>
+              </div>
+            </div>
+            <div id="dashboardHint" class="muted">上面处理全局动作，这里保留统一提示；客户端卡片可直接跳到控制、盘点或 MCP 页面。</div>
+          </div>
+        </section>
+
+        <section class="view" id="view-clients">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">安全操作</p>
+                <h2>客户端控制</h2>
+              </div>
+              <select id="clientSelect" class="select"></select>
+            </div>
+            <div id="clientDetail" class="client-detail"></div>
+            <div class="action-row">
+              <button class="button ghost" id="openInventoryFromClient" data-online-required="1">查看盘点</button>
+              <button class="button primary" id="runPreview" data-online-required="1">运行预览</button>
+              <button class="button" id="runDiff" data-online-required="1">查看差异</button>
+              <button class="button" id="runDoctor" data-online-required="1">深度体检</button>
+              <label class="checkline"><input type="checkbox" id="forcePublish" data-online-required="1" /> 强制发布</label>
+              <button class="button danger" id="runPublish" disabled>发布</button>
+            </div>
+            <div class="split">
+              <div>
+                <h3>预览 / 体检输出</h3>
+                <pre class="codebox" id="clientOutput">先运行预览或深度体检，再查看这个客户端的详细结果。</pre>
+              </div>
+              <div>
+                <div class="panel-head slim">
+                  <h3>备份</h3>
+                  <button class="button small" id="loadBackups" data-online-required="1">加载备份</button>
+                </div>
+                <div id="backupList" class="backup-list"></div>
+                <pre class="codebox smallbox" id="backupInspect">回滚前请先检查备份详情。</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-inventory">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">只读审计</p>
+                <h2>真实盘点</h2>
+              </div>
+              <div class="hero-actions">
+                <select id="inventoryClientSelect" class="select"></select>
+                <button class="button ghost" id="refreshInventory" data-online-required="1">刷新盘点</button>
+                <button class="button ghost" id="exportInventoryJson" data-online-required="1">导出当前 JSON</button>
+                <button class="button ghost" id="exportInventoryMarkdown" data-online-required="1">导出当前 Markdown</button>
+                <button class="button ghost" id="exportInventoryAllJson" data-online-required="1">导出全量 JSON</button>
+              </div>
+            </div>
+            <div class="filters">
+              <select id="inventoryDiffTypeFilter" class="select">
+                <option value="">全部差异类型</option>
+                <option value="live_only">只看 live 独有</option>
+                <option value="pool_only">只看仅池内</option>
+                <option value="published_only">只看发布缺失</option>
+                <option value="source_mismatch">只看来源不一致</option>
+              </select>
+              <select id="inventoryScopeFilter" class="select">
+                <option value="">全部来源范围</option>
+                <option value="target_dir">目标目录</option>
+                <option value="extra_dir">额外目录</option>
+                <option value="imported">导入项</option>
+              </select>
+              <input id="inventorySourceClientFilter" class="input" placeholder="按来源客户端筛选，例如 openclaw" />
+            </div>
+            <div id="inventorySummaryCards" class="inventory-grid"></div>
+            <div id="inventoryDetail" class="inventory-detail-panel"></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-mcp">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">结构化配置管理</p>
+                <h2>MCP</h2>
+              </div>
+              <div class="hero-actions">
+                <select id="mcpClientSelect" class="select"></select>
+                <button class="button ghost" id="refreshMcp" data-online-required="1">刷新 MCP</button>
+                <button class="button" id="runMcpDedupe" data-online-required="1">Codex 一键去重</button>
+              </div>
+            </div>
+            <div id="mcpSummary" class="inventory-grid"></div>
+            <div class="skills-layout">
+              <div class="panel inset-panel">
+                <div id="mcpDetail"></div>
+              </div>
+              <aside class="panel inset-panel skill-drawer">
+                <div class="panel-head slim">
+                  <div>
+                    <p class="eyebrow">编辑器</p>
+                    <h3 id="mcpFormTitle">新增或编辑 MCP server</h3>
+                  </div>
+                </div>
+                <form id="mcpForm" class="form">
+                  <label>原名称<input id="mcpOriginalName" class="input" placeholder="更新时使用，新增可留空" /></label>
+                  <label>名称<input id="mcpName" class="input" required /></label>
+                  <label>命令<input id="mcpCommand" class="input" required /></label>
+                  <label>参数<textarea id="mcpArgs" class="input textarea" placeholder="每行一个参数"></textarea></label>
+                  <label class="checkline"><input type="checkbox" id="mcpEnabled" checked /> 启用</label>
+                  <div class="action-row compact">
+                    <button class="button primary" type="submit" data-online-required="1">保存</button>
+                    <button class="button ghost" type="button" id="mcpFormReset">清空</button>
+                  </div>
+                </form>
+                <pre id="mcpDiffOutput" class="codebox smallbox">最近一次 MCP diff 会显示在这里。</pre>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-cleanup">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">非破坏性候选清单</p>
+                <h2>技能池清理</h2>
+              </div>
+              <div class="hero-actions">
+                <button class="button primary" id="runCleanupScan" data-online-required="1">扫描候选项</button>
+                <button class="button ghost" id="refreshCleanup" data-online-required="1">刷新候选项</button>
+                <button class="button ghost" id="exportCleanup" data-online-required="1">导出候选清单</button>
+              </div>
+            </div>
+            <div class="filters">
+              <select id="cleanupLabelFilter" class="select">
+                <option value="">全部标签</option>
+                <option value="candidate">candidate</option>
+                <option value="keep">keep</option>
+                <option value="ignore">ignore</option>
+              </select>
+            </div>
+            <div id="cleanupSummary" class="muted">尚未加载清理候选项。</div>
+            <div id="cleanupTable" class="table-wrap"></div>
+            <pre id="cleanupOutput" class="codebox smallbox">导出结果和最近一次扫描摘要会显示在这里。</pre>
+          </div>
+        </section>
+
+        <section class="view active" id="view-skills">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">矩阵式总管</p>
+                <h2>技能总管</h2>
+              </div>
+              <div class="hero-actions">
+                <button class="pill active" id="showSkillMatrix" data-skill-mode="matrix">逻辑矩阵</button>
+                <button class="pill" id="showSkillInstances" data-skill-mode="instances">原始实例</button>
+                <button class="button ghost" id="refreshSkillManager" data-online-required="1">刷新</button>
+              </div>
+            </div>
+            <div id="skillMatrixSection" class="matrix-manager">
+              <div class="matrix-toolbar">
+                <div class="matrix-toolbar-main">
+                  <input class="input matrix-search" id="matrixSearch" placeholder="搜索逻辑 skill、冲突族、说明..." />
+                  <select class="select" id="matrixClientFilter">
+                    <option value="">全部客户端</option>
+                  </select>
+                  <select class="select" id="matrixAnomalyFilter">
+                    <option value="">全部状态/异常</option>
+                    <option value="published">已发布</option>
+                    <option value="pool_only">池内可见未生效</option>
+                    <option value="live_only">live 存在未纳管</option>
+                    <option value="disabled">禁用</option>
+                    <option value="shadowed">冲突遮蔽</option>
+                    <option value="source_mismatch">来源不一致</option>
+                    <option value="duplicate_across_clients">跨客户端重复</option>
+                  </select>
+                  <select class="select" id="matrixSourceScopeFilter">
+                    <option value="">全部来源范围</option>
+                    <option value="target_dir">目标目录</option>
+                    <option value="extra_dir">额外目录</option>
+                    <option value="client_live">自定义 live</option>
+                    <option value="global_source">全局源库</option>
+                    <option value="imported">导入项</option>
+                  </select>
+                </div>
+                <div class="matrix-toolbar-actions">
+                  <button class="button small" id="reloadSkillMatrix" data-online-required="1">应用筛选</button>
+                  <button class="button small ghost" id="clearMatrixFilters" data-online-required="1">清空</button>
+                </div>
+              </div>
+
+              <div class="matrix-summary-strip">
+                <div id="skillMatrixMeta" class="matrix-summary-text">尚未加载技能矩阵。</div>
+                <div class="badge-row matrix-toggle-row">
+                  <button class="pill" id="matrixOnlyAnomalies">仅看异常</button>
+                  <button class="pill" id="matrixOnlyDuplicates">仅看重复</button>
+                </div>
+              </div>
+
+              <div class="matrix-hub">
+                <div class="matrix-main-column">
+                  <div id="skillsMatrixTable" class="matrix-board"></div>
+                </div>
+
+                <aside class="matrix-side-column">
+                  <section class="panel inset-panel skill-drawer" id="matrixInspectorPanel">
+                    <div class="panel-head slim">
+                      <div>
+                        <p class="eyebrow">逻辑详情</p>
+                        <h3 id="matrixDrawerTitle">请选择一个逻辑 skill</h3>
+                      </div>
+                      <button class="button small ghost" id="clearMatrixDetail">清空</button>
+                    </div>
+                    <div id="matrixDrawerBody"></div>
+                  </section>
+
+                  <section class="panel inset-panel matrix-side-panel">
+                    <div class="panel-head slim">
+                      <div>
+                        <p class="eyebrow">发现</p>
+                        <h3>未纳管与异常</h3>
+                      </div>
+                      <button class="button small ghost" type="button" id="refreshDiscovery" data-online-required="1">刷新发现</button>
+                    </div>
+                    <div id="discoverySummary" class="matrix-discovery-host">尚未加载发现结果。</div>
+                  </section>
+
+                  <section class="panel inset-panel matrix-side-panel">
+                    <div class="panel-head slim">
+                      <div>
+                        <p class="eyebrow">扫描源</p>
+                        <h3>自定义扫描源库</h3>
+                      </div>
+                      <div class="hero-actions">
+                        <button class="button small" id="scanEnabledSources" data-online-required="1">扫描已启用源</button>
+                        <button class="button small ghost" id="refreshScanSources" data-online-required="1">刷新</button>
+                      </div>
+                    </div>
+                    <div id="scanSourcesTable" class="scan-source-host"></div>
+                    <form id="scanSourceForm" class="form compact-form matrix-side-form">
+                      <label>路径<input class="input" id="scanSourcePath" data-online-required="1" placeholder="例如 %USERPROFILE%\.cc-switch\skills" required /></label>
+                      <div class="matrix-form-grid">
+                        <label>角色
+                          <select class="select" id="scanSourceRole" data-online-required="1">
+                            <option value="global_source">全局源库</option>
+                            <option value="client_live">客户端 live</option>
+                            <option value="both">两者都是</option>
+                          </select>
+                        </label>
+                        <label>客户端
+                          <select class="select" id="scanSourceClient" data-online-required="1">
+                            <option value="">无</option>
+                          </select>
+                        </label>
+                        <label>类型
+                          <select class="select" id="scanSourceKind" data-online-required="1">
+                            <option value="stable">stable</option>
+                            <option value="workspace">workspace</option>
+                            <option value="transient">transient</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div class="action-row compact">
+                        <button class="button primary" type="submit" data-online-required="1">添加扫描源</button>
+                      </div>
+                    </form>
+                  </section>
+                </aside>
+              </div>
+            </div>
+            <div id="skillInstancesSection" class="hidden">
+              <div class="filters skill-filters">
+                <input class="input" id="skillSearch" placeholder="搜索技能、来源、冲突族..." />
+                <select class="select" id="skillClientFilter">
+                  <option value="">全部客户端</option>
+                </select>
+                <select class="select" id="skillStatusFilter">
+                  <option value="">全部状态</option>
+                  <option value="active">生效中</option>
+                  <option value="shadowed">被遮蔽</option>
+                  <option value="disabled">已禁用</option>
+                </select>
+                <select class="select" id="skillEnabledFilter">
+                  <option value="">全部启用状态</option>
+                  <option value="enabled">全局已启用</option>
+                  <option value="disabled">全局已禁用</option>
+                </select>
+                <select class="select" id="skillScopeFilter">
+                  <option value="">全部来源范围</option>
+                  <option value="target_dir">目标目录</option>
+                  <option value="extra_dir">额外目录</option>
+                  <option value="client_live">自定义 live</option>
+                  <option value="global_source">全局源库</option>
+                  <option value="imported">导入项</option>
+                </select>
+                <select class="select" id="skillSortBy">
+                  <option value="name">按名称排序</option>
+                  <option value="status">按状态排序</option>
+                  <option value="source_scope">按来源范围排序</option>
+                  <option value="imported_at">按导入时间排序</option>
+                  <option value="last_seen_at">按最近发现排序</option>
+                </select>
+                <button class="button ghost" id="toggleSkillSortDir" data-online-required="1">升序</button>
+                <select class="select" id="skillPageSize" data-online-required="1">
+                  <option value="10">10 / 页</option>
+                  <option value="25">25 / 页</option>
+                  <option value="50">50 / 页</option>
+                  <option value="100">100 / 页</option>
+                </select>
+                <button class="button" id="reloadSkills" data-online-required="1">应用筛选</button>
+                <button class="button ghost" id="clearSkillFilters" data-online-required="1">清空筛选</button>
+              </div>
+              <div class="skill-toolbar-meta">
+                <div id="skillResultMeta" class="muted">尚未加载技能列表。</div>
+                <div id="skillFamilyFilter" class="skill-family-filter"></div>
+              </div>
+              <div class="skills-layout">
+                <div class="panel inset-panel">
+                  <div id="skillsTable" class="table-wrap"></div>
+                  <div id="skillPagination" class="pagination"></div>
+                </div>
+                <aside class="panel inset-panel skill-drawer">
+                  <div class="panel-head slim">
+                    <div>
+                      <p class="eyebrow">实例详情</p>
+                      <h3 id="skillDrawerTitle">请选择一个技能</h3>
+                    </div>
+                    <button class="button small ghost" id="clearSkillDetail">清空</button>
+                  </div>
+                  <div id="skillDrawerBody"></div>
+                </aside>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-sync">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">跨客户端模板同步</p>
+                <h2>同步中心</h2>
+              </div>
+              <div class="hero-actions">
+                <button class="button ghost" id="syncUseSelectedFamilies" data-online-required="1">使用矩阵已选</button>
+                <button class="button ghost" id="syncClearSelection" data-online-required="1">清空同步结果</button>
+              </div>
+            </div>
+            <div class="matrix-toolbar">
+              <div class="matrix-toolbar-main">
+                <label>源客户端
+                  <select class="select" id="syncSourceClient" data-online-required="1"></select>
+                </label>
+                <label class="checkline"><input type="checkbox" id="syncIncludeSkills" data-online-required="1" checked /> 同步 Skill</label>
+                <label class="checkline"><input type="checkbox" id="syncIncludeMcp" data-online-required="1" checked /> 同步 MCP</label>
+              </div>
+              <div class="matrix-toolbar-actions">
+                <button class="pill active" id="syncScopeAll">全部已发布 family</button>
+                <button class="pill" id="syncScopeSelected">当前已选 family</button>
+              </div>
+            </div>
+            <div class="sync-layout">
+              <div class="panel inset-panel">
+                <div class="panel-head slim">
+                  <div>
+                    <p class="eyebrow">目标</p>
+                    <h3>目标客户端</h3>
+                  </div>
+                </div>
+                <div id="syncTargetList" class="sync-target-list"></div>
+                <div id="syncFamilySummary" class="muted">当前按源客户端全部已发布 family 同步。</div>
+                <div class="action-row">
+                  <button class="button primary" id="previewSync" data-online-required="1">预览同步</button>
+                  <button class="button" id="applySync" data-online-required="1">应用同步</button>
+                </div>
+              </div>
+              <aside class="panel inset-panel skill-drawer">
+                <div class="panel-head slim">
+                  <div>
+                    <p class="eyebrow">模板说明</p>
+                    <h3>同步语义</h3>
+                  </div>
+                </div>
+                <div class="sync-note-list">
+                  <p>Skill 按“源客户端当前已发布 family 决策”提取模板，不直接复制 live 目录。</p>
+                  <p>MCP 仅对 `codex / claude / hermes` 启用写入同步，且首版只做 `merge`，不会删除目标端独有项。</p>
+                  <p>遇到 `未解决 family`、`目标不可见`、`MCP 不支持同步` 时会明确跳过并解释原因。</p>
+                </div>
+              </aside>
+            </div>
+            <div class="split">
+              <div>
+                <h3>预览结果</h3>
+                <div id="syncPreviewOutput" class="codebox">先选择源客户端、目标客户端，再运行预览。</div>
+              </div>
+              <div>
+                <h3>应用结果</h3>
+                <div id="syncApplyOutput" class="codebox">应用同步后，会在这里看到成功、跳过、失败和已回滚结果。</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-conflicts">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">同族只能选一个</p>
+                <h2>冲突裁决</h2>
+              </div>
+            </div>
+            <div id="conflictList" class="conflict-list"></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-import">
+          <div class="import-grid">
+            <form class="panel form" id="githubImportForm">
+              <p class="eyebrow">GitHub</p>
+              <h2>导入仓库或子目录</h2>
+              <label>仓库或 URL<input class="input" name="repo_or_url" data-online-required="1" placeholder="owner/repo 或 https://github.com/owner/repo" required /></label>
+              <label>Ref<input class="input" name="ref" data-online-required="1" placeholder="main、tag、branch、commit" /></label>
+              <label>子目录<input class="input" name="subdir" data-online-required="1" placeholder="可选，例如 skills/demo" /></label>
+              <button class="button primary" type="submit" data-online-required="1">导入 GitHub</button>
+            </form>
+            <form class="panel form" id="zipImportForm">
+              <p class="eyebrow">ZIP 压缩包</p>
+              <h2>导入本地技能包</h2>
+              <label>ZIP 文件<input class="input file" type="file" name="zip" data-online-required="1" accept=".zip" required /></label>
+              <button class="button primary" type="submit" data-online-required="1">导入 ZIP</button>
+            </form>
+          </div>
+          <pre class="codebox" id="importOutput">导入结果会显示在这里。</pre>
+        </section>
+
+        <section class="view" id="view-reports">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">可读审计记录</p>
+                <h2>报告</h2>
+              </div>
+              <div class="hero-actions">
+                <button class="button" id="regenerateReports" data-online-required="1">重新生成</button>
+                <button class="button ghost" id="toggleRawReport">切换原文</button>
+              </div>
+            </div>
+            <div class="report-tabs">
+              <button class="pill active" data-report="skills_index">SKILLS_INDEX</button>
+              <button class="pill" data-report="conflicts">CONFLICTS</button>
+              <button class="pill" data-report="inventory">INVENTORY</button>
+              <button class="pill" data-report="cleanup_candidates">CLEANUP</button>
+            </div>
+            <div id="reportMeta" class="muted"></div>
+            <article id="reportRendered" class="report"></article>
+            <pre id="reportRaw" class="codebox hidden"></pre>
+          </div>
+        </section>
+
+        <section class="event-log">
+          <div class="panel-head slim">
+            <h3>事件日志</h3>
+            <button class="button small ghost" id="clearLog">清空</button>
+          </div>
+          <div id="eventLog"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>
