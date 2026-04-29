@@ -1,10 +1,9 @@
-# SkillPool
+## Maintainers
 
-<!--
-  Co-Author: Simon Su (Simon-Su-1105)
-  Email: 1362495971@qq.com
-  Role: Key Maintainer & Contributor
--->
+**Simon Su** ([@Simon-Su-1105](https://github.com/Simon-Su-1105)) — Key Maintainer & Contributor  
+Email: 1362495971@qq.com
+
+---
 
 English summary: SkillPool is a Chinese-first local control center for managing one shared skill pool across six AI clients, with safe preview, publish, rollback, inventory, MCP config management, and cross-client template sync.
 
