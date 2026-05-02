@@ -5,6 +5,8 @@ import mimetypes
 import os
 import re
 import secrets
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -769,10 +771,22 @@ def _cleanup_stale_pid(pid_path: Path) -> None:
     try:
         raw = pid_path.read_text(encoding="utf-8", errors="replace").strip()
         old_pid = int(raw)
-        os.kill(old_pid, 0)  # signal 0 = check if alive
-    except (ValueError, OSError, ProcessLookupError, PermissionError):
+        if sys.platform == "win32":
+            # Windows: check via tasklist
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {old_pid}", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if str(old_pid) not in result.stdout:
+                pid_path.unlink(missing_ok=True)
+        else:
+            os.kill(old_pid, 0)  # signal 0 = check if alive
+    except Exception:
+        # Process not found or PID file unreadable - clean up
         try:
-            pid_path.unlink()
+            pid_path.unlink(missing_ok=True)
         except OSError:
             pass
 
