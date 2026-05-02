@@ -21,6 +21,7 @@ from skillpool_app.core import (
     write_json,
 )
 
+
 class MixinInventory:
     """Mixin: _family_members, _family_display_skill, _visible_members_for_client, _client_family_inventory_maps, skills_matrix..."""
 
@@ -30,7 +31,9 @@ class MixinInventory:
             families.setdefault(skill["conflict_family"], []).append(skill)
         return families
 
-    def _family_display_skill(self, members: List[Dict[str, object]]) -> Dict[str, object]:
+    def _family_display_skill(
+        self, members: List[Dict[str, object]]
+    ) -> Dict[str, object]:
         status_rank = {"active": 0, "shadowed": 1, "disabled": 2}
         return sorted(
             members,
@@ -42,7 +45,9 @@ class MixinInventory:
             ),
         )[0]
 
-    def _visible_members_for_client(self, client: str, members: List[Dict[str, object]]) -> List[Dict[str, object]]:
+    def _visible_members_for_client(
+        self, client: str, members: List[Dict[str, object]]
+    ) -> List[Dict[str, object]]:
         visible = []
         for member in members:
             available_clients = member.get("available_clients", [])
@@ -51,7 +56,9 @@ class MixinInventory:
             visible.append(member)
         return visible
 
-    def _client_family_inventory_maps(self, registry: Dict, clients: Dict) -> Dict[str, Dict[str, object]]:
+    def _client_family_inventory_maps(
+        self, registry: Dict, clients: Dict
+    ) -> Dict[str, Dict[str, object]]:
         result: Dict[str, Dict[str, object]] = {}
         for client in sorted(clients["clients"].keys()):
             inventory = self._inventory_skills_for_client(client, registry, clients)
@@ -63,9 +70,18 @@ class MixinInventory:
             result[client] = {
                 "inventory": inventory,
                 "published": published_family_map,
-                "live_only": {item.get("normalized_name") for item in inventory.get("live_only", [])},
-                "pool_only": {item.get("normalized_name") for item in inventory.get("pool_only", [])},
-                "source_mismatch": {item.get("normalized_name") for item in inventory.get("source_mismatch", [])},
+                "live_only": {
+                    item.get("normalized_name")
+                    for item in inventory.get("live_only", [])
+                },
+                "pool_only": {
+                    item.get("normalized_name")
+                    for item in inventory.get("pool_only", [])
+                },
+                "source_mismatch": {
+                    item.get("normalized_name")
+                    for item in inventory.get("source_mismatch", [])
+                },
             }
         return result
 
@@ -87,9 +103,23 @@ class MixinInventory:
         rows = []
         for family, members in sorted(family_map.items()):
             display = self._family_display_skill(members)
-            source_scopes = sorted({str(member.get("source_scope") or "-") for member in members})
-            source_clients = sorted({str(member.get("source_client")) for member in members if member.get("source_client")})
-            published_for = sorted({client_name for member in members for client_name in client_map.get(member["skill_id"], [])})
+            source_scopes = sorted(
+                {str(member.get("source_scope") or "-") for member in members}
+            )
+            source_clients = sorted(
+                {
+                    str(member.get("source_client"))
+                    for member in members
+                    if member.get("source_client")
+                }
+            )
+            published_for = sorted(
+                {
+                    client_name
+                    for member in members
+                    for client_name in client_map.get(member["skill_id"], [])
+                }
+            )
             row = {
                 "conflict_family": family,
                 "name": display.get("name"),
@@ -107,21 +137,32 @@ class MixinInventory:
             for client_name in sorted(clients["clients"].keys()):
                 visible_members = self._visible_members_for_client(client_name, members)
                 if not visible_members:
-                    row["clients"][client_name] = {"status": "not_applicable", "flags": [], "skill_id": None}
+                    row["clients"][client_name] = {
+                        "status": "not_applicable",
+                        "flags": [],
+                        "skill_id": None,
+                    }
                     continue
                 applicable_clients += 1
-                published_skill_id = inventory_maps[client_name]["published"].get(family)
+                published_skill_id = inventory_maps[client_name]["published"].get(
+                    family
+                )
                 live_only = family in inventory_maps[client_name]["live_only"]
                 pool_only = family in inventory_maps[client_name]["pool_only"]
-                source_mismatch_flag = family in inventory_maps[client_name]["source_mismatch"]
+                source_mismatch_flag = (
+                    family in inventory_maps[client_name]["source_mismatch"]
+                )
                 enabled_candidates = [
                     member
                     for member in visible_members
                     if member.get("enabled_global") != "disabled"
-                    and member.get("client_overrides", {}).get(client_name, "inherit") != "disabled"
+                    and member.get("client_overrides", {}).get(client_name, "inherit")
+                    != "disabled"
                 ]
                 flags = []
-                if any(member.get("status") == "shadowed" for member in visible_members):
+                if any(
+                    member.get("status") == "shadowed" for member in visible_members
+                ):
                     flags.append("shadowed")
                 if source_mismatch_flag:
                     status = "source_mismatch"
@@ -141,12 +182,22 @@ class MixinInventory:
                     "status": status,
                     "flags": flags,
                     "skill_id": published_skill_id,
-                    "visible_skill_ids": [member["skill_id"] for member in visible_members],
+                    "visible_skill_ids": [
+                        member["skill_id"] for member in visible_members
+                    ],
                 }
-                if status in {"source_mismatch", "live_only", "pool_only", "disabled", "shadowed"}:
+                if status in {
+                    "source_mismatch",
+                    "live_only",
+                    "pool_only",
+                    "disabled",
+                    "shadowed",
+                }:
                     row["anomalies"].append({"client": client_name, "type": status})
             if applicable_clients > 1:
-                row["anomalies"].append({"client": None, "type": "duplicate_across_clients"})
+                row["anomalies"].append(
+                    {"client": None, "type": "duplicate_across_clients"}
+                )
             if include_instances:
                 row["instances"] = [
                     {
@@ -160,17 +211,31 @@ class MixinInventory:
                         "source_client": member.get("source_client"),
                         "source_root": member.get("source_root"),
                         "published_for": sorted(client_map.get(member["skill_id"], [])),
-                        "client_overrides": dict(sorted(member.get("client_overrides", {}).items())),
+                        "client_overrides": dict(
+                            sorted(member.get("client_overrides", {}).items())
+                        ),
                     }
-                    for member in sorted(members, key=lambda item: (str(item.get("name") or "").lower(), item["skill_id"]))
+                    for member in sorted(
+                        members,
+                        key=lambda item: (
+                            str(item.get("name") or "").lower(),
+                            item["skill_id"],
+                        ),
+                    )
                 ]
             if source_scope and source_scope not in row["source_scopes"]:
                 continue
-            if client and row["clients"].get(client, {}).get("status") == "not_applicable":
+            if (
+                client
+                and row["clients"].get(client, {}).get("status") == "not_applicable"
+            ):
                 continue
             if anomaly:
                 anomaly_types = {item["type"] for item in row["anomalies"]}
-                if anomaly not in anomaly_types and row["clients"].get(client or "", {}).get("status") != anomaly:
+                if (
+                    anomaly not in anomaly_types
+                    and row["clients"].get(client or "", {}).get("status") != anomaly
+                ):
                     continue
             if query_value:
                 haystack = " ".join(
@@ -185,7 +250,12 @@ class MixinInventory:
                 if query_value not in haystack:
                     continue
             rows.append(row)
-        return {"generated_at": utc_now(), "clients": sorted(clients["clients"].keys()), "total": len(rows), "rows": rows}
+        return {
+            "generated_at": utc_now(),
+            "clients": sorted(clients["clients"].keys()),
+            "total": len(rows),
+            "rows": rows,
+        }
 
     def skills_instances(
         self,
@@ -220,14 +290,23 @@ class MixinInventory:
         registry_by_fingerprint: Dict[str, List[Dict[str, object]]] = {}
         registry_by_family = self._family_members(registry)
         for skill in registry["skills"].values():
-            registry_by_fingerprint.setdefault(skill.get("fingerprint"), []).append(skill)
+            registry_by_fingerprint.setdefault(skill.get("fingerprint"), []).append(
+                skill
+            )
 
         source_summaries = []
         untracked = []
         mismatches = []
         transient_only = []
-        for source in sorted(scan_sources.get("sources", {}).values(), key=lambda item: (str(item.get("path_kind")), str(item.get("path")))):
-            discovered = self._scan_source_skill_entries(source) if self._source_exists(str(source.get("path"))) else []
+        for source in sorted(
+            scan_sources.get("sources", {}).values(),
+            key=lambda item: (str(item.get("path_kind")), str(item.get("path"))),
+        ):
+            discovered = (
+                self._scan_source_skill_entries(source)
+                if self._source_exists(str(source.get("path")))
+                else []
+            )
             managed_count = 0
             untracked_count = 0
             mismatch_count = 0
@@ -252,7 +331,11 @@ class MixinInventory:
                     mismatch_count += 1
                     payload["reason"] = "发现了同族但内容不一致的 skill"
                     payload["pool_matches"] = [
-                        {"skill_id": match["skill_id"], "path": match.get("files_path"), "source_scope": match.get("source_scope")}
+                        {
+                            "skill_id": match["skill_id"],
+                            "path": match.get("files_path"),
+                            "source_scope": match.get("source_scope"),
+                        }
                         for match in family_matches
                     ]
                     mismatches.append(payload)
@@ -284,10 +367,16 @@ class MixinInventory:
             {
                 "conflict_family": row["conflict_family"],
                 "name": row["name"],
-                "clients": [client_name for client_name, payload in row["clients"].items() if payload.get("status") != "not_applicable"],
+                "clients": [
+                    client_name
+                    for client_name, payload in row["clients"].items()
+                    if payload.get("status") != "not_applicable"
+                ],
             }
             for row in matrix["rows"]
-            if any(item["type"] == "duplicate_across_clients" for item in row["anomalies"])
+            if any(
+                item["type"] == "duplicate_across_clients" for item in row["anomalies"]
+            )
         ]
         return {
             "generated_at": utc_now(),
@@ -312,8 +401,10 @@ class MixinInventory:
 
     def discovery_summary(self, *, refresh: bool = False) -> Dict[str, object]:
         payload = self.discovery(refresh=refresh)
+
         def _first(items):
             return items[0] if items else None
+
         return {
             "generated_at": payload.get("generated_at"),
             "stale": bool(payload.get("stale")),
@@ -322,17 +413,23 @@ class MixinInventory:
                 "untracked_discovered": len(payload.get("untracked_discovered", [])),
                 "source_mismatch": len(payload.get("source_mismatch", [])),
                 "transient_only": len(payload.get("transient_only", [])),
-                "duplicate_across_clients": len(payload.get("duplicate_across_clients", [])),
+                "duplicate_across_clients": len(
+                    payload.get("duplicate_across_clients", [])
+                ),
             },
             "first_examples": {
                 "untracked_discovered": _first(payload.get("untracked_discovered", [])),
                 "source_mismatch": _first(payload.get("source_mismatch", [])),
                 "transient_only": _first(payload.get("transient_only", [])),
-                "duplicate_across_clients": _first(payload.get("duplicate_across_clients", [])),
+                "duplicate_across_clients": _first(
+                    payload.get("duplicate_across_clients", [])
+                ),
             },
         }
 
-    def discovery_details(self, group: str, *, limit: Optional[int] = None, refresh: bool = False) -> Dict[str, object]:
+    def discovery_details(
+        self, group: str, *, limit: Optional[int] = None, refresh: bool = False
+    ) -> Dict[str, object]:
         payload = self.discovery(refresh=refresh)
         valid_groups = {
             "sources",
@@ -370,9 +467,13 @@ class MixinInventory:
             client_config = self._require_client(client_name, clients)
             payload: Dict[str, object] = {"client": client_name}
             if include_skills:
-                payload["skills"] = self._inventory_skills_for_client(client_name, registry, clients)
+                payload["skills"] = self._inventory_skills_for_client(
+                    client_name, registry, clients
+                )
             if include_mcp:
-                payload["mcp"] = self._inventory_mcp_for_client(client_name, client_config)
+                payload["mcp"] = self._inventory_mcp_for_client(
+                    client_name, client_config
+                )
             results.append(payload)
 
         generated_at = utc_now()
@@ -408,7 +509,9 @@ class MixinInventory:
             return {"generated_at": generated_at, "clients": summary}
         return {"generated_at": generated_at, "clients": results}
 
-    def _skill_source_records(self, skill: Dict[str, object]) -> List[Dict[str, object]]:
+    def _skill_source_records(
+        self, skill: Dict[str, object]
+    ) -> List[Dict[str, object]]:
         records = list(skill.get("sources", []))
         if not records and skill.get("source_locator"):
             records.append(
@@ -432,7 +535,9 @@ class MixinInventory:
         )
         return records
 
-    def _skill_payload(self, skill: Dict[str, object], client_map: Dict[str, List[str]]) -> Dict[str, object]:
+    def _skill_payload(
+        self, skill: Dict[str, object], client_map: Dict[str, List[str]]
+    ) -> Dict[str, object]:
         published_for = sorted(client_map.get(skill["skill_id"], []))
         available_clients = sorted(skill.get("available_clients", []))
         return {
@@ -516,7 +621,13 @@ class MixinInventory:
         query_value = (query or "").strip().lower()
         sort_by = (sort_by or "name").strip().lower()
         sort_dir = (sort_dir or "asc").strip().lower()
-        if sort_by not in {"name", "status", "imported_at", "last_seen_at", "source_scope"}:
+        if sort_by not in {
+            "name",
+            "status",
+            "imported_at",
+            "last_seen_at",
+            "source_scope",
+        }:
             raise ValueError("Unsupported sort_by: {}".format(sort_by))
         if sort_dir not in {"asc", "desc"}:
             raise ValueError("Unsupported sort_dir: {}".format(sort_dir))
@@ -525,7 +636,9 @@ class MixinInventory:
         items = []
         for skill in registry["skills"].values():
             available_clients = sorted(skill.get("available_clients", []))
-            visible_for_client = not available_clients or (client in available_clients if client else True)
+            visible_for_client = not available_clients or (
+                client in available_clients if client else True
+            )
             if client and not visible_for_client:
                 continue
             if family and skill["conflict_family"] != family:
@@ -552,7 +665,10 @@ class MixinInventory:
                 if query_value not in haystack:
                     continue
             items.append(self._skill_payload(skill, client_map))
-        items.sort(key=lambda item: self._skill_sort_key(item, sort_by), reverse=sort_dir == "desc")
+        items.sort(
+            key=lambda item: self._skill_sort_key(item, sort_by),
+            reverse=sort_dir == "desc",
+        )
         total = len(items)
         total_pages = ((total + page_size - 1) // page_size) if total else 0
         if total_pages:
@@ -577,7 +693,13 @@ class MixinInventory:
             "skills": paged_items,
         }
 
-    def get_skill(self, skill_id: str, *, registry: Optional[Dict] = None, clients: Optional[Dict] = None) -> Dict[str, object]:
+    def get_skill(
+        self,
+        skill_id: str,
+        *,
+        registry: Optional[Dict] = None,
+        clients: Optional[Dict] = None,
+    ) -> Dict[str, object]:
         registry = registry or self.load_registry()
         clients = clients or self.load_clients()
         skill = registry["skills"].get(skill_id)
@@ -587,7 +709,10 @@ class MixinInventory:
         detail = self._skill_payload(skill, client_map)
         related_members = []
         for member in registry["skills"].values():
-            if member["conflict_family"] != skill["conflict_family"] or member["skill_id"] == skill_id:
+            if (
+                member["conflict_family"] != skill["conflict_family"]
+                or member["skill_id"] == skill_id
+            ):
                 continue
             payload = self._skill_payload(member, client_map)
             related_members.append(
@@ -637,7 +762,14 @@ class MixinInventory:
             winner_skill_ids = []
             override_summary = {}
             for client, config in clients["clients"].items():
-                winner = next((skill_id for skill_id in config.get("published_skill_ids", []) if skill_id in member_ids), None)
+                winner = next(
+                    (
+                        skill_id
+                        for skill_id in config.get("published_skill_ids", [])
+                        if skill_id in member_ids
+                    ),
+                    None,
+                )
                 if winner:
                     client_winners[client] = winner
                     winner_skill_ids.append(winner)
@@ -645,7 +777,9 @@ class MixinInventory:
                 for member in members:
                     override = member.get("client_overrides", {}).get(client)
                     if override and override != "inherit":
-                        overrides.append({"skill_id": member["skill_id"], "override": override})
+                        overrides.append(
+                            {"skill_id": member["skill_id"], "override": override}
+                        )
                 if overrides:
                     override_summary[client] = overrides
             conflict_members = []
@@ -660,7 +794,9 @@ class MixinInventory:
                         "enabled_global": member["enabled_global"],
                         "status": member["status"],
                         "published_for": sorted(client_map.get(member["skill_id"], [])),
-                        "client_overrides": dict(sorted(member.get("client_overrides", {}).items())),
+                        "client_overrides": dict(
+                            sorted(member.get("client_overrides", {}).items())
+                        ),
                     }
                 )
             conflicts.append(
@@ -691,7 +827,14 @@ class MixinInventory:
 
         candidates: Dict[str, Dict[str, object]] = {}
 
-        def add_candidate(skill_id: str, reason_type: str, message: str, *, client: Optional[str] = None, extra: Optional[Dict[str, object]] = None) -> None:
+        def add_candidate(
+            skill_id: str,
+            reason_type: str,
+            message: str,
+            *,
+            client: Optional[str] = None,
+            extra: Optional[Dict[str, object]] = None,
+        ) -> None:
             skill = registry["skills"].get(skill_id)
             if not skill:
                 return
@@ -723,23 +866,39 @@ class MixinInventory:
             inventory = self.inventory(client=client, include_mcp=False)
             for item in inventory["skills"].get("pool_only", []):
                 if item.get("skill_id"):
-                    add_candidate(item["skill_id"], "pool_only", item["reason"], client=client)
+                    add_candidate(
+                        item["skill_id"], "pool_only", item["reason"], client=client
+                    )
             for item in inventory["skills"].get("source_mismatch", []):
                 for match in item.get("pool_matches", []):
                     if match.get("skill_id"):
-                        add_candidate(match["skill_id"], "source_mismatch", item["reason"], client=client, extra={"live_path": item.get("path")})
+                        add_candidate(
+                            match["skill_id"],
+                            "source_mismatch",
+                            item["reason"],
+                            client=client,
+                            extra={"live_path": item.get("path")},
+                        )
 
         normalized_groups: Dict[str, List[Dict[str, object]]] = {}
         for skill in registry["skills"].values():
             if skill["status"] == "shadowed":
-                add_candidate(skill["skill_id"], "shadowed", "该 skill 当前处于 shadowed 状态。")
-            normalized_groups.setdefault(skill.get("normalized_name") or skill["conflict_family"], []).append(skill)
+                add_candidate(
+                    skill["skill_id"], "shadowed", "该 skill 当前处于 shadowed 状态。"
+                )
+            normalized_groups.setdefault(
+                skill.get("normalized_name") or skill["conflict_family"], []
+            ).append(skill)
 
         conflicts = self.list_conflicts(registry=registry, clients=clients)["conflicts"]
         for conflict in conflicts:
             for member in conflict["members"]:
                 if not member.get("published_for"):
-                    add_candidate(member["skill_id"], "unpublished_conflict_member", "该冲突族成员当前未发布到任何客户端。")
+                    add_candidate(
+                        member["skill_id"],
+                        "unpublished_conflict_member",
+                        "该冲突族成员当前未发布到任何客户端。",
+                    )
 
         for members in normalized_groups.values():
             if len(members) < 2:
@@ -747,9 +906,16 @@ class MixinInventory:
             fingerprints = {member["fingerprint"] for member in members}
             if len(fingerprints) <= 1:
                 for member in members:
-                    add_candidate(member["skill_id"], "duplicate_name_family", "同名或近似同名 skill 出现多份内容相同的来源记录。")
+                    add_candidate(
+                        member["skill_id"],
+                        "duplicate_name_family",
+                        "同名或近似同名 skill 出现多份内容相同的来源记录。",
+                    )
 
-        order = sorted(candidates, key=lambda skill_id: (candidates[skill_id]["name"].lower(), skill_id))
+        order = sorted(
+            candidates,
+            key=lambda skill_id: (candidates[skill_id]["name"].lower(), skill_id),
+        )
         cleanup_state = {
             "version": REGISTRY_VERSION,
             "generated_at": utc_now(),
@@ -758,14 +924,22 @@ class MixinInventory:
         }
         self.save_cleanup_candidates(cleanup_state)
         self.generate_reports(registry=registry, clients=clients)
-        return {"generated_at": cleanup_state["generated_at"], "total": len(order), "candidates": [candidates[skill_id] for skill_id in order]}
+        return {
+            "generated_at": cleanup_state["generated_at"],
+            "total": len(order),
+            "candidates": [candidates[skill_id] for skill_id in order],
+        }
 
     def cleanup_list(self) -> Dict[str, object]:
         cleanup_state = self.load_cleanup_candidates()
         return {
             "generated_at": cleanup_state.get("generated_at"),
             "total": len(cleanup_state.get("order", [])),
-            "candidates": [cleanup_state["candidates"][skill_id] for skill_id in cleanup_state.get("order", []) if skill_id in cleanup_state.get("candidates", {})],
+            "candidates": [
+                cleanup_state["candidates"][skill_id]
+                for skill_id in cleanup_state.get("order", [])
+                if skill_id in cleanup_state.get("candidates", {})
+            ],
         }
 
     def cleanup_mark(self, skill_id: str, label: str) -> Dict[str, object]:
@@ -785,7 +959,9 @@ class MixinInventory:
         cleanup_state = self.load_cleanup_candidates()
         registry = self.load_registry()
         clients = self.load_clients()
-        markdown = self._build_cleanup_candidates_report(cleanup_state, registry, clients)
+        markdown = self._build_cleanup_candidates_report(
+            cleanup_state, registry, clients
+        )
         self.cleanup_report_path.write_text(markdown, encoding="utf-8")
         write_json(self.cleanup_export_path, cleanup_state)
         return {
@@ -793,7 +969,9 @@ class MixinInventory:
             "json_path": str(self.cleanup_export_path),
         }
 
-    def inventory_export(self, *, client: Optional[str] = None, format: str = "json") -> Dict[str, object]:
+    def inventory_export(
+        self, *, client: Optional[str] = None, format: str = "json"
+    ) -> Dict[str, object]:
         format = (format or "json").strip().lower()
         inventory = self.inventory(client=client, summary_only=False)
         if format == "json":
@@ -806,7 +984,12 @@ class MixinInventory:
             }
         if format != "markdown":
             raise ValueError("inventory export format must be json or markdown")
-        markdown = self._build_inventory_markdown({"generated_at": utc_now(), "clients": [inventory] if client else inventory["clients"]})
+        markdown = self._build_inventory_markdown(
+            {
+                "generated_at": utc_now(),
+                "clients": [inventory] if client else inventory["clients"],
+            }
+        )
         return {
             "format": "markdown",
             "filename": "inventory-{}.md".format(client or "all"),
@@ -829,7 +1012,10 @@ class MixinInventory:
                 "path": str(path),
                 "content": path.read_text(encoding="utf-8") if path.exists() else "",
                 "updated_at": (
-                    datetime.utcfromtimestamp(path.stat().st_mtime).replace(microsecond=0).isoformat() + "Z"
+                    datetime.utcfromtimestamp(path.stat().st_mtime)
+                    .replace(microsecond=0)
+                    .isoformat()
+                    + "Z"
                     if path.exists()
                     else None
                 ),
@@ -864,8 +1050,14 @@ class MixinInventory:
                     source_client=(skill["source_client"] or "-"),
                     source_root=(skill.get("source_root") or "-").replace("|", "/"),
                     available=", ".join(skill["available_clients"]) or "全部",
-                    enabled={"enabled": "已启用", "disabled": "已禁用"}.get(skill["enabled_global"], skill["enabled_global"]),
-                    status={"active": "生效中", "shadowed": "被遮蔽", "disabled": "已禁用"}.get(skill["status"], skill["status"]),
+                    enabled={"enabled": "已启用", "disabled": "已禁用"}.get(
+                        skill["enabled_global"], skill["enabled_global"]
+                    ),
+                    status={
+                        "active": "生效中",
+                        "shadowed": "被遮蔽",
+                        "disabled": "已禁用",
+                    }.get(skill["status"], skill["status"]),
                     published=", ".join(skill["published_for"]) or "-",
                 )
             )
@@ -883,32 +1075,63 @@ class MixinInventory:
             lines.append("## {}".format(conflict["conflict_family"]))
             lines.append("")
             winners = ", ".join(conflict["winner_skill_ids"]) or "-"
-            override_summary = ", ".join(
-                "{}={}".format(
-                    client,
-                    "; ".join("{}:{}".format(item["skill_id"], item["override"]) for item in items),
+            override_summary = (
+                ", ".join(
+                    "{}={}".format(
+                        client,
+                        "; ".join(
+                            "{}:{}".format(item["skill_id"], item["override"])
+                            for item in items
+                        ),
+                    )
+                    for client, items in sorted(conflict["override_summary"].items())
                 )
-                for client, items in sorted(conflict["override_summary"].items())
-            ) or "-"
+                or "-"
+            )
             lines.append("- 当前胜出项: `{}`".format(winners))
-            lines.append("- 各客户端胜出项: {}".format(", ".join("{}={}".format(client, skill_id) for client, skill_id in sorted(conflict["client_winners"].items())) or "-"))
+            lines.append(
+                "- 各客户端胜出项: {}".format(
+                    ", ".join(
+                        "{}={}".format(client, skill_id)
+                        for client, skill_id in sorted(
+                            conflict["client_winners"].items()
+                        )
+                    )
+                    or "-"
+                )
+            )
             lines.append("- Override 摘要: {}".format(override_summary))
             lines.append("")
-            lines.append("| skill_id | 名称 | 来源 | 来源范围 | 全局启用 | 当前状态 | 已发布到 | 客户端覆盖 |")
+            lines.append(
+                "| skill_id | 名称 | 来源 | 来源范围 | 全局启用 | 当前状态 | 已发布到 | 客户端覆盖 |"
+            )
             lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
             for skill in conflict["members"]:
-                overrides = ", ".join(
-                    "{}={}".format(client, value)
-                    for client, value in sorted(skill["client_overrides"].items())
-                ) or "-"
+                overrides = (
+                    ", ".join(
+                        "{}={}".format(client, value)
+                        for client, value in sorted(skill["client_overrides"].items())
+                    )
+                    or "-"
+                )
                 lines.append(
                     "| {skill_id} | {name} | {source} | {source_scope} | {enabled} | {status} | {published_for} | {overrides} |".format(
                         skill_id=skill["skill_id"],
                         name=skill["name"].replace("|", "/"),
                         source=skill["source_type"],
-                        source_scope={"target_dir": "目标目录", "extra_dir": "额外目录", "imported": "导入项"}.get(skill["source_scope"], skill["source_scope"]),
-                        enabled={"enabled": "已启用", "disabled": "已禁用"}.get(skill["enabled_global"], skill["enabled_global"]),
-                        status={"active": "生效中", "shadowed": "被遮蔽", "disabled": "已禁用"}.get(skill["status"], skill["status"]),
+                        source_scope={
+                            "target_dir": "目标目录",
+                            "extra_dir": "额外目录",
+                            "imported": "导入项",
+                        }.get(skill["source_scope"], skill["source_scope"]),
+                        enabled={"enabled": "已启用", "disabled": "已禁用"}.get(
+                            skill["enabled_global"], skill["enabled_global"]
+                        ),
+                        status={
+                            "active": "生效中",
+                            "shadowed": "被遮蔽",
+                            "disabled": "已禁用",
+                        }.get(skill["status"], skill["status"]),
                         published_for=", ".join(skill["published_for"]) or "-",
                         overrides=overrides,
                     )
@@ -941,14 +1164,28 @@ class MixinInventory:
                     "",
                     "### 技能盘点",
                     "",
-                    "- pool_visible_count: {}".format(skills.get("pool_visible_count", "-")),
+                    "- pool_visible_count: {}".format(
+                        skills.get("pool_visible_count", "-")
+                    ),
                     "- published_count: {}".format(skills.get("published_count", "-")),
-                    "- live_target_count: {}".format(skills.get("live_target_count", "-")),
-                    "- live_extra_dir_count: {}".format(skills.get("live_extra_dir_count", "-")),
-                    "- live_total_count: {}".format(skills.get("live_total_count", "-")),
-                    "- unmanaged_live_count: {}".format(skills.get("unmanaged_live_count", "-")),
-                    "- published_missing_from_live_count: {}".format(skills.get("published_missing_from_live_count", "-")),
-                    "- pool_not_published_count: {}".format(skills.get("pool_not_published_count", "-")),
+                    "- live_target_count: {}".format(
+                        skills.get("live_target_count", "-")
+                    ),
+                    "- live_extra_dir_count: {}".format(
+                        skills.get("live_extra_dir_count", "-")
+                    ),
+                    "- live_total_count: {}".format(
+                        skills.get("live_total_count", "-")
+                    ),
+                    "- unmanaged_live_count: {}".format(
+                        skills.get("unmanaged_live_count", "-")
+                    ),
+                    "- published_missing_from_live_count: {}".format(
+                        skills.get("published_missing_from_live_count", "-")
+                    ),
+                    "- pool_not_published_count: {}".format(
+                        skills.get("pool_not_published_count", "-")
+                    ),
                     "",
                     "### 技能来源目录",
                     "",
@@ -974,8 +1211,12 @@ class MixinInventory:
                     "",
                     "- live_only: {}".format(len(skills.get("live_only", []))),
                     "- pool_only: {}".format(len(skills.get("pool_only", []))),
-                    "- published_only: {}".format(len(skills.get("published_only", []))),
-                    "- source_mismatch: {}".format(len(skills.get("source_mismatch", []))),
+                    "- published_only: {}".format(
+                        len(skills.get("published_only", []))
+                    ),
+                    "- source_mismatch: {}".format(
+                        len(skills.get("source_mismatch", []))
+                    ),
                     "",
                 ]
             )
@@ -1014,7 +1255,9 @@ class MixinInventory:
                     "",
                     "- source_status: {}".format(mcp.get("source_status", "-")),
                     "- server_count: {}".format(
-                        mcp["server_count"] if mcp.get("server_count") is not None else "当前无法可靠统计"
+                        mcp["server_count"]
+                        if mcp.get("server_count") is not None
+                        else "当前无法可靠统计"
                     ),
                     "",
                     "#### 配置源文件",
@@ -1041,8 +1284,12 @@ class MixinInventory:
                             name=(server.get("name") or "-").replace("|", "/"),
                             enabled="是" if server.get("enabled") else "否",
                             command=(server.get("command") or "-").replace("|", "/"),
-                            args=(" ".join(server.get("args") or []) or "-").replace("|", "/"),
-                            source_file=(server.get("source_file") or "-").replace("|", "/"),
+                            args=(" ".join(server.get("args") or []) or "-").replace(
+                                "|", "/"
+                            ),
+                            source_file=(server.get("source_file") or "-").replace(
+                                "|", "/"
+                            ),
                         )
                     )
             else:
@@ -1060,7 +1307,9 @@ class MixinInventory:
     def _build_inventory_report(self) -> str:
         return self._build_inventory_markdown(self.inventory(summary_only=False))
 
-    def _build_cleanup_candidates_report(self, cleanup_state: Dict, registry: Dict, clients: Dict) -> str:
+    def _build_cleanup_candidates_report(
+        self, cleanup_state: Dict, registry: Dict, clients: Dict
+    ) -> str:
         lines = [
             "# CLEANUP_CANDIDATES",
             "",
@@ -1077,7 +1326,13 @@ class MixinInventory:
             item = cleanup_state.get("candidates", {}).get(skill_id)
             if not item:
                 continue
-            reasons = "; ".join("{}:{}".format(reason.get("type"), reason.get("message")) for reason in item.get("reasons", [])) or "-"
+            reasons = (
+                "; ".join(
+                    "{}:{}".format(reason.get("type"), reason.get("message"))
+                    for reason in item.get("reasons", [])
+                )
+                or "-"
+            )
             lines.append(
                 "| {skill_id} | {name} | {label} | {status} | {source_scope} | {source_client} | {published_for} | {reasons} |".format(
                     skill_id=skill_id,
@@ -1092,7 +1347,9 @@ class MixinInventory:
             )
         return "\n".join(lines) + "\n"
 
-    def _discover_skill_entries(self, source_dir: Path, scope: str) -> List[Dict[str, object]]:
+    def _discover_skill_entries(
+        self, source_dir: Path, scope: str
+    ) -> List[Dict[str, object]]:
         if not source_dir.exists():
             return []
         entries = []
@@ -1134,7 +1391,9 @@ class MixinInventory:
         entries.sort(key=lambda item: (item["normalized_name"], item["path"]))
         return entries
 
-    def _inventory_pool_skills_for_client(self, client: str, registry: Dict, clients: Dict) -> List[Dict[str, object]]:
+    def _inventory_pool_skills_for_client(
+        self, client: str, registry: Dict, clients: Dict
+    ) -> List[Dict[str, object]]:
         client_map = self._client_map(clients)
         items = []
         for skill in registry["skills"].values():
@@ -1145,7 +1404,9 @@ class MixinInventory:
         items.sort(key=lambda item: (item["name"].lower(), item["skill_id"]))
         return items
 
-    def _published_skill_ids_for_client(self, client: str, client_config: Dict[str, object]) -> List[str]:
+    def _published_skill_ids_for_client(
+        self, client: str, client_config: Dict[str, object]
+    ) -> List[str]:
         manifest_path = Path(client_config["manifest_path"])
         if manifest_path.exists():
             manifest = load_json(manifest_path, {})
@@ -1154,10 +1415,13 @@ class MixinInventory:
                 return list(published)
         return list(client_config.get("published_skill_ids", []))
 
-    def _inventory_diff_payload(self, item: Dict[str, object], reason: str, **extra: object) -> Dict[str, object]:
+    def _inventory_diff_payload(
+        self, item: Dict[str, object], reason: str, **extra: object
+    ) -> Dict[str, object]:
         payload = {
             "name": item.get("name"),
-            "normalized_name": item.get("normalized_name") or item.get("conflict_family"),
+            "normalized_name": item.get("normalized_name")
+            or item.get("conflict_family"),
             "path": item.get("path") or item.get("files_path"),
             "scope": item.get("scope") or item.get("source_scope"),
             "source_root": item.get("source_root"),
@@ -1169,7 +1433,9 @@ class MixinInventory:
             payload[key] = value
         return payload
 
-    def _inventory_skills_for_client(self, client: str, registry: Dict, clients: Dict) -> Dict[str, object]:
+    def _inventory_skills_for_client(
+        self, client: str, registry: Dict, clients: Dict
+    ) -> Dict[str, object]:
         client_config = self._require_client(client, clients)
         target_dir = Path(client_config["target_dir"])
         source_roots = self._client_source_roots(client, client_config)
@@ -1185,8 +1451,7 @@ class MixinInventory:
         if is_wsl_unc(target_dir):
             role_map.setdefault(str(target_dir), []).append("external source")
         source_directories = [
-            {"path": path, "roles": roles}
-            for path, roles in sorted(role_map.items())
+            {"path": path, "roles": roles} for path, roles in sorted(role_map.items())
         ]
 
         live_target_entries = self._discover_skill_entries(target_dir, "target_dir")
@@ -1194,9 +1459,13 @@ class MixinInventory:
         live_custom_entries: List[Dict[str, object]] = []
         for source in source_roots:
             if source["scope"] == "extra_dir":
-                live_extra_entries.extend(self._discover_skill_entries(Path(source["path"]), "extra_dir"))
+                live_extra_entries.extend(
+                    self._discover_skill_entries(Path(source["path"]), "extra_dir")
+                )
             elif source["scope"] == "client_live":
-                live_custom_entries.extend(self._discover_skill_entries(Path(source["path"]), "client_live"))
+                live_custom_entries.extend(
+                    self._discover_skill_entries(Path(source["path"]), "client_live")
+                )
         live_entries = sorted(
             live_target_entries + live_extra_entries + live_custom_entries,
             key=lambda item: (item["normalized_name"], item["path"]),
@@ -1216,8 +1485,14 @@ class MixinInventory:
             registry_by_fingerprint.setdefault(item["fingerprint"], []).append(item)
             pool_by_family.setdefault(item["conflict_family"], []).append(item)
 
-        live_fingerprints = {item["fingerprint"] for item in live_entries if item.get("fingerprint")}
-        live_target_fingerprints = {item["fingerprint"] for item in live_target_entries if item.get("fingerprint")}
+        live_fingerprints = {
+            item["fingerprint"] for item in live_entries if item.get("fingerprint")
+        }
+        live_target_fingerprints = {
+            item["fingerprint"]
+            for item in live_target_entries
+            if item.get("fingerprint")
+        }
 
         live_only = []
         source_mismatch = []
@@ -1242,19 +1517,31 @@ class MixinInventory:
                     )
                 )
             else:
-                live_only.append(self._inventory_diff_payload(item, "live 技能存在，但尚未纳入 SkillPool registry"))
+                live_only.append(
+                    self._inventory_diff_payload(
+                        item, "live 技能存在，但尚未纳入 SkillPool registry"
+                    )
+                )
 
         pool_only = []
         for item in pool_entries:
             if item["fingerprint"] in live_fingerprints:
                 continue
-            pool_only.append(self._inventory_diff_payload(item, "池内技能当前未出现在客户端 live 目录"))
+            pool_only.append(
+                self._inventory_diff_payload(
+                    item, "池内技能当前未出现在客户端 live 目录"
+                )
+            )
 
         published_only = []
         for item in published_entries:
             if item["fingerprint"] in live_target_fingerprints:
                 continue
-            published_only.append(self._inventory_diff_payload(item, "发布清单包含该技能，但 live target 目录中未找到"))
+            published_only.append(
+                self._inventory_diff_payload(
+                    item, "发布清单包含该技能，但 live target 目录中未找到"
+                )
+            )
 
         return {
             "client": client,
@@ -1267,7 +1554,9 @@ class MixinInventory:
             "live_total_count": len(live_entries),
             "unmanaged_live_count": len(live_only) + len(source_mismatch),
             "published_missing_from_live_count": len(published_only),
-            "pool_not_published_count": max(len(pool_entries) - len(published_entries), 0),
+            "pool_not_published_count": max(
+                len(pool_entries) - len(published_entries), 0
+            ),
             "live_only": live_only,
             "pool_only": pool_only,
             "published_only": published_only,
@@ -1275,7 +1564,9 @@ class MixinInventory:
             "published_skill_ids": published_ids,
         }
 
-    def generate_reports(self, registry: Optional[Dict] = None, clients: Optional[Dict] = None) -> Dict[str, str]:
+    def generate_reports(
+        self, registry: Optional[Dict] = None, clients: Optional[Dict] = None
+    ) -> Dict[str, str]:
         registry = registry or self.load_registry()
         clients = clients or self.load_clients()
         self.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -1283,8 +1574,12 @@ class MixinInventory:
         conflicts = self._build_conflicts_report(registry, clients)
         inventory = self._build_inventory_report()
         cleanup_state = self.load_cleanup_candidates()
-        cleanup_candidates = self._build_cleanup_candidates_report(cleanup_state, registry, clients)
-        (self.reports_dir / "SKILLS_INDEX.md").write_text(skills_index, encoding="utf-8")
+        cleanup_candidates = self._build_cleanup_candidates_report(
+            cleanup_state, registry, clients
+        )
+        (self.reports_dir / "SKILLS_INDEX.md").write_text(
+            skills_index, encoding="utf-8"
+        )
         (self.reports_dir / "CONFLICTS.md").write_text(conflicts, encoding="utf-8")
         (self.reports_dir / "INVENTORY.md").write_text(inventory, encoding="utf-8")
         self.cleanup_report_path.write_text(cleanup_candidates, encoding="utf-8")
@@ -1295,6 +1590,3 @@ class MixinInventory:
             "inventory": str(self.reports_dir / "INVENTORY.md"),
             "cleanup_candidates": str(self.cleanup_report_path),
         }
-
-
-

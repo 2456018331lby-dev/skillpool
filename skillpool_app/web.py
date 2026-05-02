@@ -23,7 +23,9 @@ def _truthy(value: Optional[str]) -> bool:
     return str(value or "").lower() in {"1", "true", "yes", "on"}
 
 
-def _first(query: Dict[str, list], key: str, default: Optional[str] = None) -> Optional[str]:
+def _first(
+    query: Dict[str, list], key: str, default: Optional[str] = None
+) -> Optional[str]:
     values = query.get(key)
     if not values:
         return default
@@ -176,7 +178,11 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return
         if len(segments) == 4 and segments[:3] == ["api", "sync", "template"]:
             families = query.get("family") or None
-            self._send_ok(self.pool.sync_inspect(self._safe_path_param(segments[3]), families=families))
+            self._send_ok(
+                self.pool.sync_inspect(
+                    self._safe_path_param(segments[3]), families=families
+                )
+            )
             return
         if path == "/api/mcp/clients":
             self._send_ok(self.pool.mcp_clients())
@@ -184,7 +190,11 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
         if len(segments) == 4 and segments[:3] == ["api", "mcp", "clients"]:
             self._send_ok(self.pool.mcp_list(self._safe_path_param(segments[3])))
             return
-        if len(segments) == 5 and segments[:3] == ["api", "mcp", "clients"] and segments[4] == "diff":
+        if (
+            len(segments) == 5
+            and segments[:3] == ["api", "mcp", "clients"]
+            and segments[4] == "diff"
+        ):
             self._send_ok(self.pool.mcp_diff(self._safe_path_param(segments[3])))
             return
         if path == "/api/inventory":
@@ -211,31 +221,92 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             )
             return
         if len(segments) == 3 and segments[:2] == ["api", "inventory"]:
-            self._send_ok(self.pool.inventory(client=self._safe_path_param(segments[2])))
+            self._send_ok(
+                self.pool.inventory(client=self._safe_path_param(segments[2]))
+            )
             return
-        if len(segments) == 4 and segments[:2] == ["api", "inventory"] and segments[3] == "skills":
-            inventory = self.pool.inventory(client=self._safe_path_param(segments[2]), include_mcp=False)
-            self._send_ok({"client": inventory["client"], "generated_at": inventory["generated_at"], "skills": inventory["skills"]})
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "inventory"]
+            and segments[3] == "skills"
+        ):
+            inventory = self.pool.inventory(
+                client=self._safe_path_param(segments[2]), include_mcp=False
+            )
+            self._send_ok(
+                {
+                    "client": inventory["client"],
+                    "generated_at": inventory["generated_at"],
+                    "skills": inventory["skills"],
+                }
+            )
             return
-        if len(segments) == 4 and segments[:2] == ["api", "inventory"] and segments[3] == "mcp":
-            inventory = self.pool.inventory(client=self._safe_path_param(segments[2]), include_skills=False)
-            self._send_ok({"client": inventory["client"], "generated_at": inventory["generated_at"], "mcp": inventory["mcp"]})
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "inventory"]
+            and segments[3] == "mcp"
+        ):
+            inventory = self.pool.inventory(
+                client=self._safe_path_param(segments[2]), include_skills=False
+            )
+            self._send_ok(
+                {
+                    "client": inventory["client"],
+                    "generated_at": inventory["generated_at"],
+                    "mcp": inventory["mcp"],
+                }
+            )
             return
 
-        if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "preview":
-            self._send_ok(self.pool.preview(self._safe_path_param(segments[2]), detailed=_truthy(_first(query, "detailed"))))
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "clients"]
+            and segments[3] == "preview"
+        ):
+            self._send_ok(
+                self.pool.preview(
+                    self._safe_path_param(segments[2]),
+                    detailed=_truthy(_first(query, "detailed")),
+                )
+            )
             return
-        if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "diff":
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "clients"]
+            and segments[3] == "diff"
+        ):
             self._send_ok(self.pool.diff(self._safe_path_param(segments[2])))
             return
-        if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "doctor":
-            self._send_ok(self.pool.doctor(deep=_truthy(_first(query, "deep")), client=self._safe_path_param(segments[2])))
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "clients"]
+            and segments[3] == "doctor"
+        ):
+            self._send_ok(
+                self.pool.doctor(
+                    deep=_truthy(_first(query, "deep")),
+                    client=self._safe_path_param(segments[2]),
+                )
+            )
             return
-        if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "backups":
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "clients"]
+            and segments[3] == "backups"
+        ):
             self._send_ok(self.pool.rollback_list(self._safe_path_param(segments[2])))
             return
-        if len(segments) == 5 and segments[:2] == ["api", "clients"] and segments[3] == "backups":
-            self._send_ok(self.pool.rollback_inspect(self._safe_path_param(segments[2]), self._safe_path_param(segments[4])))
+        if (
+            len(segments) == 5
+            and segments[:2] == ["api", "clients"]
+            and segments[3] == "backups"
+        ):
+            self._send_ok(
+                self.pool.rollback_inspect(
+                    self._safe_path_param(segments[2]),
+                    self._safe_path_param(segments[4]),
+                )
+            )
             return
         if path == "/api/cleanup":
             self._send_ok(self.pool.cleanup_list())
@@ -254,7 +325,11 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             if not group:
                 raise ValueError("Query parameter 'group' is required")
             limit = query.get("limit")
-            self._send_ok(self.pool.discovery_details(group, limit=(_first_int(query, "limit", 0) if limit else None)))
+            self._send_ok(
+                self.pool.discovery_details(
+                    group, limit=(_first_int(query, "limit", 0) if limit else None)
+                )
+            )
             return
         if path == "/api/discovery":
             self._send_ok(self.pool.discovery())
@@ -280,11 +355,21 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/override/inherit":
             payload = self._read_json_body()
-            self._send_ok(self.pool.override_inherit(str(payload.get("client", "")), str(payload.get("conflict_family", ""))))
+            self._send_ok(
+                self.pool.override_inherit(
+                    str(payload.get("client", "")),
+                    str(payload.get("conflict_family", "")),
+                )
+            )
             return
         if path == "/api/override/disable":
             payload = self._read_json_body()
-            self._send_ok(self.pool.override_disable(str(payload.get("client", "")), str(payload.get("conflict_family", ""))))
+            self._send_ok(
+                self.pool.override_disable(
+                    str(payload.get("client", "")),
+                    str(payload.get("conflict_family", "")),
+                )
+            )
             return
         if path == "/api/import/github":
             payload = self._read_json_body()
@@ -298,7 +383,9 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/import/batch":
             payload = self._read_json_body()
-            self._send_ok(self.pool.import_batch(Path(str(payload.get("manifest_path", "")))))
+            self._send_ok(
+                self.pool.import_batch(Path(str(payload.get("manifest_path", ""))))
+            )
             return
         if path == "/api/import/detect":
             payload = self._read_json_body()
@@ -327,7 +414,8 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
                     [str(item) for item in payload.get("target_clients", [])],
                     include_skills=bool(payload.get("include_skills", True)),
                     include_mcp=bool(payload.get("include_mcp", True)),
-                    families=[str(item) for item in payload.get("families", [])] or None,
+                    families=[str(item) for item in payload.get("families", [])]
+                    or None,
                 )
             )
             return
@@ -339,7 +427,8 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
                     [str(item) for item in payload.get("target_clients", [])],
                     include_skills=bool(payload.get("include_skills", True)),
                     include_mcp=bool(payload.get("include_mcp", True)),
-                    families=[str(item) for item in payload.get("families", [])] or None,
+                    families=[str(item) for item in payload.get("families", [])]
+                    or None,
                 )
             )
             return
@@ -373,7 +462,11 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/cleanup/mark":
             payload = self._read_json_body()
-            self._send_ok(self.pool.cleanup_mark(str(payload.get("skill_id", "")), str(payload.get("label", ""))))
+            self._send_ok(
+                self.pool.cleanup_mark(
+                    str(payload.get("skill_id", "")), str(payload.get("label", ""))
+                )
+            )
             return
         if path == "/api/scan-sources/add":
             payload = self._read_json_body()
@@ -417,26 +510,44 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             result = self.pool.run_tool_action(str(payload.get("action_id", "")))
             if result.get("requires_server_shutdown"):
                 self._send_ok({"action_id": "stop_console", "stopping": True})
-                threading.Thread(target=self._shutdown_console_server, daemon=True).start()
+                threading.Thread(
+                    target=self._shutdown_console_server, daemon=True
+                ).start()
                 return
             self._send_ok(result)
             return
 
-        if len(segments) == 4 and segments[:2] == ["api", "skills"] and segments[3] == "enable":
-            self._send_ok(self.pool.set_enabled_global(self._safe_path_param(segments[2]), True))
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "skills"]
+            and segments[3] == "enable"
+        ):
+            self._send_ok(
+                self.pool.set_enabled_global(self._safe_path_param(segments[2]), True)
+            )
             return
-        if len(segments) == 4 and segments[:2] == ["api", "skills"] and segments[3] == "disable":
-            self._send_ok(self.pool.set_enabled_global(self._safe_path_param(segments[2]), False))
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "skills"]
+            and segments[3] == "disable"
+        ):
+            self._send_ok(
+                self.pool.set_enabled_global(self._safe_path_param(segments[2]), False)
+            )
             return
         if len(segments) == 5 and segments[:3] == ["api", "mcp", "clients"]:
             payload = self._read_json_body()
             client = self._safe_path_param(segments[3])
             action = segments[4]
             if action == "enable":
-                self._send_ok(self.pool.mcp_enable(client, str(payload.get("server_name", ""))))
+                self._send_ok(
+                    self.pool.mcp_enable(client, str(payload.get("server_name", "")))
+                )
                 return
             if action == "disable":
-                self._send_ok(self.pool.mcp_disable(client, str(payload.get("server_name", ""))))
+                self._send_ok(
+                    self.pool.mcp_disable(client, str(payload.get("server_name", "")))
+                )
                 return
             if action == "add":
                 self._send_ok(
@@ -456,28 +567,57 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
                         client,
                         str(payload.get("server_name", "")),
                         new_name=payload.get("new_name") or None,
-                        command=payload.get("command") if "command" in payload else None,
-                        args=[str(item) for item in payload.get("args", [])] if "args" in payload else None,
+                        command=payload.get("command")
+                        if "command" in payload
+                        else None,
+                        args=[str(item) for item in payload.get("args", [])]
+                        if "args" in payload
+                        else None,
                         enabled=enabled if isinstance(enabled, bool) else None,
                     )
                 )
                 return
             if action == "remove":
-                self._send_ok(self.pool.mcp_remove(client, str(payload.get("server_name", ""))))
+                self._send_ok(
+                    self.pool.mcp_remove(client, str(payload.get("server_name", "")))
+                )
                 return
-        if len(segments) == 5 and segments[:4] == ["api", "mcp", "clients", "codex"] and segments[4] == "dedupe":
+        if (
+            len(segments) == 5
+            and segments[:4] == ["api", "mcp", "clients", "codex"]
+            and segments[4] == "dedupe"
+        ):
             self._send_ok(self.pool.mcp_dedupe_codex())
             return
-        if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "publish":
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "clients"]
+            and segments[3] == "publish"
+        ):
             payload = self._read_json_body()
-            self._send_ok(self.pool.publish(self._safe_path_param(segments[2]), force=bool(payload.get("force", False))))
+            self._send_ok(
+                self.pool.publish(
+                    self._safe_path_param(segments[2]),
+                    force=bool(payload.get("force", False)),
+                )
+            )
             return
-        if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "rollback":
+        if (
+            len(segments) == 4
+            and segments[:2] == ["api", "clients"]
+            and segments[3] == "rollback"
+        ):
             payload = self._read_json_body()
             backup_id = payload.get("backup_id") or None
             if payload.get("latest"):
-                backup_id = self.pool.latest_backup_id(self._safe_path_param(segments[2]))
-            self._send_ok(self.pool.rollback(self._safe_path_param(segments[2]), backup_id=backup_id))
+                backup_id = self.pool.latest_backup_id(
+                    self._safe_path_param(segments[2])
+                )
+            self._send_ok(
+                self.pool.rollback(
+                    self._safe_path_param(segments[2]), backup_id=backup_id
+                )
+            )
             return
 
         raise FileNotFoundError(path)
@@ -523,21 +663,29 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             if header_end == -1:
                 continue
             raw_headers = segment[:header_end].decode("utf-8", errors="replace")
-            part_body = segment[header_end + 4:]
+            part_body = segment[header_end + 4 :]
             if part_body.endswith(b"\r\n"):
                 part_body = part_body[:-2]
             disp_match = re.search(
-                r'Content-Disposition:\s*form-data;[^"]*name="([^"]*)"', raw_headers, re.IGNORECASE
+                r'Content-Disposition:\s*form-data;[^"]*name="([^"]*)"',
+                raw_headers,
+                re.IGNORECASE,
             )
             name = disp_match.group(1) if disp_match else ""
             fname_match = re.search(
-                r'Content-Disposition:\s*form-data;[^"]*filename="([^"]*)"', raw_headers, re.IGNORECASE
+                r'Content-Disposition:\s*form-data;[^"]*filename="([^"]*)"',
+                raw_headers,
+                re.IGNORECASE,
             )
             filename = fname_match.group(1) if fname_match else ""
             ct_match = re.search(r"Content-Type:\s*(\S+)", raw_headers, re.IGNORECASE)
             part_ct = ct_match.group(1) if ct_match else ""
             if name:
-                parts[name] = {"data": part_body, "filename": filename, "content_type": part_ct}
+                parts[name] = {
+                    "data": part_body,
+                    "filename": filename,
+                    "content_type": part_ct,
+                }
         return parts
 
     def _import_uploaded_zip(self) -> Dict:
@@ -549,7 +697,9 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
         if field is None or not field.get("data"):
             raise ValueError("ZIP upload field must be named 'zip' or 'file'")
         suffix = Path(field.get("filename", "") or "uploaded.zip").suffix or ".zip"
-        with tempfile.NamedTemporaryFile(prefix="skillpool-upload-", suffix=suffix, delete=False) as handle:
+        with tempfile.NamedTemporaryFile(
+            prefix="skillpool-upload-", suffix=suffix, delete=False
+        ) as handle:
             temp_path = Path(handle.name)
             handle.write(field["data"])
         try:
@@ -591,7 +741,9 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
         self._send_json({"ok": True, "data": data}, status=status)
 
     def _send_error(self, code: str, message: str, status: int):
-        self._send_json({"ok": False, "error": {"code": code, "message": message}}, status=status)
+        self._send_json(
+            {"ok": False, "error": {"code": code, "message": message}}, status=status
+        )
 
     def _send_json(self, payload, status: int = 200):
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
@@ -603,11 +755,18 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def create_server(pool: SkillPool, host: str = "127.0.0.1", port: int = 8765) -> SkillPoolWebServer:
+def create_server(
+    pool: SkillPool, host: str = "127.0.0.1", port: int = 8765
+) -> SkillPoolWebServer:
     return SkillPoolWebServer((host, port), pool)
 
 
-def serve(pool: SkillPool, host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False) -> int:
+def serve(
+    pool: SkillPool,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    open_browser: bool = False,
+) -> int:
     server = create_server(pool, host=host, port=port)
     actual_host, actual_port = server.server_address[:2]
     url = "http://{}:{}/".format(actual_host, actual_port)

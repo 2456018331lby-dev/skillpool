@@ -28,7 +28,10 @@ REGISTRY_VERSION = 1
 USER_HOME = Path(os.environ.get("USERPROFILE") or str(Path.home()))
 HERMES_WSL_DISTRO = os.environ.get("SKILLPOOL_HERMES_DISTRO", "Ubuntu")
 _detected_wsl_user = os.environ.get("USER") or os.environ.get("LOGNAME") or "user"
-HERMES_WSL_HOME = os.environ.get("SKILLPOOL_HERMES_HOME", "/home/" + _detected_wsl_user).rstrip("/") or "/home/" + _detected_wsl_user
+HERMES_WSL_HOME = (
+    os.environ.get("SKILLPOOL_HERMES_HOME", "/home/" + _detected_wsl_user).rstrip("/")
+    or "/home/" + _detected_wsl_user
+)
 
 
 def _win_home(*parts: str) -> str:
@@ -38,8 +41,14 @@ def _win_home(*parts: str) -> str:
 def _hermes_unc(*parts: str) -> str:
     linux_path = HERMES_WSL_HOME
     if parts:
-        linux_path = linux_path.rstrip("/") + "/" + "/".join(part.strip("/\\") for part in parts if part)
-    return "\\\\wsl.localhost\\{}{}".format(HERMES_WSL_DISTRO, linux_path.replace("/", "\\"))
+        linux_path = (
+            linux_path.rstrip("/")
+            + "/"
+            + "/".join(part.strip("/\\") for part in parts if part)
+        )
+    return "\\\\wsl.localhost\\{}{}".format(
+        HERMES_WSL_DISTRO, linux_path.replace("/", "\\")
+    )
 
 
 DEFAULT_ROOT = Path(os.environ.get("SKILLPOOL_HOME", str(USER_HOME / ".skill-pool")))
@@ -186,7 +195,12 @@ GLOBAL_SCAN_SOURCE_DEFAULTS = [
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def slugify(value: str) -> str:
@@ -215,7 +229,9 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
             continue
         # Handle list items (- value)
         if stripped.startswith("- ") and current_key is not None:
-            list_values.setdefault(current_key, []).append(stripped[2:].strip().strip('\'"'))
+            list_values.setdefault(current_key, []).append(
+                stripped[2:].strip().strip("'\"")
+            )
             continue
         if ":" not in line:
             continue
@@ -231,14 +247,16 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
             try:
                 frontmatter[key] = json.loads(raw_value)
             except (json.JSONDecodeError, ValueError):
-                frontmatter[key] = raw_value.strip('\'"')
+                frontmatter[key] = raw_value.strip("'\"")
         else:
-            frontmatter[key] = raw_value.strip('\'"')
+            frontmatter[key] = raw_value.strip("'\"")
         current_key = key
     # Flush any accumulated list values
     for key, values in list_values.items():
         if key not in frontmatter:
-            frontmatter[key] = values if len(values) > 1 else (values[0] if values else "")
+            frontmatter[key] = (
+                values if len(values) > 1 else (values[0] if values else "")
+            )
     body = "\n".join(lines[end_index + 1 :])
     return frontmatter, body
 
@@ -249,7 +267,9 @@ def read_text(path: Path) -> str:
 
 def write_json(path: Path, data: Dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def load_json(path: Path, default: Dict) -> Dict:
@@ -268,7 +288,9 @@ def hash_bytes(data: bytes) -> str:
 def hash_directory(directory: Path) -> str:
     digest = hashlib.sha256()
     for file_path in sorted(p for p in directory.rglob("*") if p.is_file()):
-        digest.update(str(file_path.relative_to(directory)).replace("\\", "/").encode("utf-8"))
+        digest.update(
+            str(file_path.relative_to(directory)).replace("\\", "/").encode("utf-8")
+        )
         digest.update(b"\0")
         try:
             with file_path.open("rb") as fh:
@@ -301,7 +323,14 @@ def _powershell_command(*lines: str) -> List[str]:
     script = "\n".join(lines)
     # Validate script doesn't contain dangerous pipeline/chain operators injected via user input
     # Allow only our own controlled script patterns
-    return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script]
+    return [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        script,
+    ]
 
 
 def yaml_scalar(value: str) -> str:
@@ -311,6 +340,7 @@ def yaml_scalar(value: str) -> str:
 def safe_rmtree(path: Path) -> None:
     if not path.exists():
         return
+
     def _onerror(func, target, exc_info):
         try:
             os.chmod(target, stat.S_IWRITE)
@@ -318,6 +348,7 @@ def safe_rmtree(path: Path) -> None:
         except OSError:
             if os.path.exists(target):
                 raise
+
     shutil.rmtree(str(path), onerror=_onerror)
 
 
@@ -383,7 +414,6 @@ def copy_existing_tree(source_dir: Path, destination_dir: Path) -> None:
             shutil.copy2(str(source_file), str(target_file))
 
 
-
 from skillpool_app.mixin_state import MixinState  # noqa: E402
 from skillpool_app.mixin_console import MixinConsole  # noqa: E402
 from skillpool_app.mixin_import import MixinImport  # noqa: E402
@@ -407,10 +437,14 @@ class SkillPool(
     _GITHUB_TRANSIENT_CODES = {429, 500, 502, 503, 504}
 
     @staticmethod
-    def _github_request(url: str, dest: Path, timeout: int = 30, max_retries: int = 3) -> None:
+    def _github_request(
+        url: str, dest: Path, timeout: int = 30, max_retries: int = 3
+    ) -> None:
         """Download from a GitHub URL with auth token, timeout, and retry logic."""
         headers = {"User-Agent": "skillpool/0.1"}
-        token = os.environ.get("GITHUB_TOKEN") or os.environ.get("SKILLPOOL_GITHUB_TOKEN")
+        token = os.environ.get("GITHUB_TOKEN") or os.environ.get(
+            "SKILLPOOL_GITHUB_TOKEN"
+        )
         if token:
             headers["Authorization"] = "Bearer " + token
 
@@ -444,7 +478,11 @@ class SkillPool(
                 continue
         raise last_exc
 
-    def __init__(self, root: Optional[Path] = None, clients: Optional[Dict[str, Dict[str, Optional[str]]]] = None):
+    def __init__(
+        self,
+        root: Optional[Path] = None,
+        clients: Optional[Dict[str, Dict[str, Optional[str]]]] = None,
+    ):
         self.root = Path(root or DEFAULT_ROOT)
         self.code_dir = self.root / "skillpool_app"
         self.pool_dir = self.root / "pool" / "skills"
@@ -472,7 +510,9 @@ class SkillPool(
         self.desktop_shortcut_path = USER_HOME / "Desktop" / "SkillPool Console.lnk"
         self._default_clients = clients or DEFAULT_CLIENTS
 
-    def _client_state(self, client: str, config: Dict[str, Optional[str]]) -> Dict[str, object]:
+    def _client_state(
+        self, client: str, config: Dict[str, Optional[str]]
+    ) -> Dict[str, object]:
         return {
             "id": client,
             "target_dir": config.get("target_dir"),
@@ -533,8 +573,12 @@ class SkillPool(
             "default_entry": bool(default_entry),
         }
 
-    def _default_scan_sources(self, clients: Optional[Dict] = None) -> Dict[str, object]:
-        clients = clients or load_json(self.clients_path, {"version": REGISTRY_VERSION, "clients": {}})
+    def _default_scan_sources(
+        self, clients: Optional[Dict] = None
+    ) -> Dict[str, object]:
+        clients = clients or load_json(
+            self.clients_path, {"version": REGISTRY_VERSION, "clients": {}}
+        )
         sources = {}
         for client, config in clients.get("clients", {}).items():
             target_dir = config.get("target_dir")
@@ -577,7 +621,14 @@ class SkillPool(
                     suggested=bool(item["suggested"]),
                     client=item.get("client"),
                     notes=str(item.get("notes") or ""),
-                    source_scope=str(item.get("source_scope") or ("global_source" if item["role"] == "global_source" else "client_live")),
+                    source_scope=str(
+                        item.get("source_scope")
+                        or (
+                            "global_source"
+                            if item["role"] == "global_source"
+                            else "client_live"
+                        )
+                    ),
                     default_entry=True,
                 )
                 sources[entry["id"]] = entry
@@ -616,11 +667,15 @@ class SkillPool(
                 },
             )
         else:
-            existing_clients = load_json(self.clients_path, {"version": REGISTRY_VERSION, "clients": {}})
+            existing_clients = load_json(
+                self.clients_path, {"version": REGISTRY_VERSION, "clients": {}}
+            )
             changed = False
             for client, config in self._default_clients.items():
                 if client not in existing_clients.get("clients", {}):
-                    existing_clients.setdefault("clients", {})[client] = self._client_state(client, config)
+                    existing_clients.setdefault("clients", {})[client] = (
+                        self._client_state(client, config)
+                    )
                     changed = True
                 else:
                     defaults = self._client_state(client, config)
@@ -632,14 +687,28 @@ class SkillPool(
             if changed:
                 write_json(self.clients_path, existing_clients)
         if not self.mcp_state_path.exists():
-            write_json(self.mcp_state_path, {"version": REGISTRY_VERSION, "clients": {}})
+            write_json(
+                self.mcp_state_path, {"version": REGISTRY_VERSION, "clients": {}}
+            )
         if not self.cleanup_candidates_path.exists():
             write_json(
                 self.cleanup_candidates_path,
-                {"version": REGISTRY_VERSION, "generated_at": utc_now(), "candidates": {}, "order": []},
+                {
+                    "version": REGISTRY_VERSION,
+                    "generated_at": utc_now(),
+                    "candidates": {},
+                    "order": [],
+                },
             )
         if not self.scan_sources_path.exists():
-            write_json(self.scan_sources_path, self._default_scan_sources(load_json(self.clients_path, {"version": REGISTRY_VERSION, "clients": {}})))
+            write_json(
+                self.scan_sources_path,
+                self._default_scan_sources(
+                    load_json(
+                        self.clients_path, {"version": REGISTRY_VERSION, "clients": {}}
+                    )
+                ),
+            )
         if not self.discovery_cache_path.exists():
             write_json(
                 self.discovery_cache_path,
@@ -667,12 +736,19 @@ class SkillPool(
             "clients": str(self.clients_path),
         }
 
-
     def status(self) -> Dict[str, object]:
         registry = self.load_registry()
         clients = self.load_clients()
-        enabled = sum(1 for skill in registry["skills"].values() if skill["enabled_global"] == "enabled")
-        disabled = sum(1 for skill in registry["skills"].values() if skill["enabled_global"] == "disabled")
+        enabled = sum(
+            1
+            for skill in registry["skills"].values()
+            if skill["enabled_global"] == "enabled"
+        )
+        disabled = sum(
+            1
+            for skill in registry["skills"].values()
+            if skill["enabled_global"] == "disabled"
+        )
         families = {}
         for skill in registry["skills"].values():
             families.setdefault(skill["conflict_family"], []).append(skill["skill_id"])
@@ -682,11 +758,17 @@ class SkillPool(
             "enabled_count": enabled,
             "disabled_count": disabled,
             "conflict_family_count": len(families),
-            "shadowed_count": sum(1 for skill in registry["skills"].values() if skill["status"] == "shadowed"),
+            "shadowed_count": sum(
+                1
+                for skill in registry["skills"].values()
+                if skill["status"] == "shadowed"
+            ),
             "clients": clients["clients"],
         }
 
-    def doctor(self, *, deep: bool = False, client: Optional[str] = None) -> Dict[str, object]:
+    def doctor(
+        self, *, deep: bool = False, client: Optional[str] = None
+    ) -> Dict[str, object]:
         clients = self.load_clients()
         checks = []
         client_items = clients["clients"].items()
@@ -697,7 +779,9 @@ class SkillPool(
         for client_id, config in client_items:
             generated_at = utc_now()
             target_dir = Path(config["target_dir"])
-            config_path = Path(config["config_path"]) if config.get("config_path") else None
+            config_path = (
+                Path(config["config_path"]) if config.get("config_path") else None
+            )
             check = {
                 "client": client_id,
                 "generated_at": generated_at,
@@ -710,7 +794,9 @@ class SkillPool(
                 publish_root = self.publish_dir / client_id
                 publish_root.mkdir(parents=True, exist_ok=True)
                 write_json(publish_root / "doctor.json", check)
-                self._record_deep_doctor_metadata(clients, client_id, generated_at, check["status"])
+                self._record_deep_doctor_metadata(
+                    clients, client_id, generated_at, check["status"]
+                )
                 clients_changed = True
             checks.append(check)
         if clients_changed:
@@ -722,7 +808,9 @@ class SkillPool(
             "checks": checks,
         }
 
-    def _deep_doctor_check(self, client: str, config: Dict[str, object], registry: Dict) -> Dict[str, object]:
+    def _deep_doctor_check(
+        self, client: str, config: Dict[str, object], registry: Dict
+    ) -> Dict[str, object]:
         errors = []
         warnings = []
         target_dir = Path(config["target_dir"])
@@ -731,9 +819,15 @@ class SkillPool(
         published_ids = manifest.get("published_skill_ids", [])
         target_map = self._target_skill_map(target_dir)
         if not published_ids and len(target_map) > 0:
-            warnings.append("target contains skills but no manifest has been published yet")
+            warnings.append(
+                "target contains skills but no manifest has been published yet"
+            )
         if published_ids and len(target_map) != len(published_ids):
-            errors.append("manifest count {} does not match target skill count {}".format(len(published_ids), len(target_map)))
+            errors.append(
+                "manifest count {} does not match target skill count {}".format(
+                    len(published_ids), len(target_map)
+                )
+            )
         missing = []
         mismatched = []
         for skill_id in published_ids:
@@ -748,20 +842,36 @@ class SkillPool(
             if target_skill["fingerprint"] != skill["fingerprint"]:
                 mismatched.append(skill_id)
         if missing:
-            errors.append("published skills missing from target: {}".format(", ".join(missing[:10])))
+            errors.append(
+                "published skills missing from target: {}".format(
+                    ", ".join(missing[:10])
+                )
+            )
         if mismatched:
-            errors.append("published skill fingerprints differ from registry: {}".format(", ".join(mismatched[:10])))
+            errors.append(
+                "published skill fingerprints differ from registry: {}".format(
+                    ", ".join(mismatched[:10])
+                )
+            )
         broken_paths = self._broken_direct_children(target_dir)
         if broken_paths:
             warnings.append("target has broken or inaccessible direct children")
         extra_dir_status = self._extra_dir_status(client, config, registry)
         unmanaged = [
-            item for item in extra_dir_status
-            if item["scope"] == "extra_dir" and item["exists"] and item["skill_count"] > 0 and not item["managed"]
+            item
+            for item in extra_dir_status
+            if item["scope"] == "extra_dir"
+            and item["exists"]
+            and item["skill_count"] > 0
+            and not item["managed"]
         ]
         if unmanaged:
             errors.append("configured extraDirs contain unmanaged skills")
-        missing_extra = [item for item in extra_dir_status if item["scope"] == "extra_dir" and not item["exists"]]
+        missing_extra = [
+            item
+            for item in extra_dir_status
+            if item["scope"] == "extra_dir" and not item["exists"]
+        ]
         if missing_extra:
             warnings.append("configured extraDirs are missing")
         if is_wsl_unc(target_dir) and not self.discover_skills(target_dir):
@@ -777,7 +887,9 @@ class SkillPool(
             "broken_paths": broken_paths,
         }
 
-    def generate_reports(self, registry: Optional[Dict] = None, clients: Optional[Dict] = None) -> Dict[str, str]:
+    def generate_reports(
+        self, registry: Optional[Dict] = None, clients: Optional[Dict] = None
+    ) -> Dict[str, str]:
         registry = registry or self.load_registry()
         clients = clients or self.load_clients()
         self.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -785,8 +897,12 @@ class SkillPool(
         conflicts = self._build_conflicts_report(registry, clients)
         inventory = self._build_inventory_report()
         cleanup_state = self.load_cleanup_candidates()
-        cleanup_candidates = self._build_cleanup_candidates_report(cleanup_state, registry, clients)
-        (self.reports_dir / "SKILLS_INDEX.md").write_text(skills_index, encoding="utf-8")
+        cleanup_candidates = self._build_cleanup_candidates_report(
+            cleanup_state, registry, clients
+        )
+        (self.reports_dir / "SKILLS_INDEX.md").write_text(
+            skills_index, encoding="utf-8"
+        )
         (self.reports_dir / "CONFLICTS.md").write_text(conflicts, encoding="utf-8")
         (self.reports_dir / "INVENTORY.md").write_text(inventory, encoding="utf-8")
         self.cleanup_report_path.write_text(cleanup_candidates, encoding="utf-8")
@@ -804,7 +920,6 @@ class SkillPool(
             for skill_id in config.get("published_skill_ids", []):
                 client_map.setdefault(skill_id, []).append(client)
         return client_map
-
 
     def _require_skill(self, registry: Dict, skill_id: str) -> Dict:
         try:

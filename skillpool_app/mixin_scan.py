@@ -27,6 +27,7 @@ from skillpool_app.core import (
     utc_now,
 )
 
+
 class MixinScan:
     """Mixin: discover_skills, _expand_config_path, _read_openclaw_extra_dirs, _source_exists, _scan_sources_for_client..."""
 
@@ -50,7 +51,9 @@ class MixinScan:
                 dirnames[:] = []
         return sorted(found)
 
-    def _expand_config_path(self, raw_path: str, config_path: Optional[str] = None) -> Path:
+    def _expand_config_path(
+        self, raw_path: str, config_path: Optional[str] = None
+    ) -> Path:
         expanded = os.path.expanduser(os.path.expandvars(str(raw_path)))
         path = Path(expanded)
         if not path.is_absolute() and config_path:
@@ -65,7 +68,9 @@ class MixinScan:
             data = json.loads(Path(config_path).read_text(encoding="utf-8"))
         except Exception:
             return []
-        extra_dirs = (((data.get("skills") or {}).get("load") or {}).get("extraDirs")) or []
+        extra_dirs = (
+            ((data.get("skills") or {}).get("load") or {}).get("extraDirs")
+        ) or []
         if isinstance(extra_dirs, str):
             extra_dirs = [extra_dirs]
         result = []
@@ -94,7 +99,11 @@ class MixinScan:
         for source in scan_sources.get("sources", {}).values():
             if enabled_only and not source.get("enabled"):
                 continue
-            if not include_suggested and source.get("suggested") and not source.get("enabled"):
+            if (
+                not include_suggested
+                and source.get("suggested")
+                and not source.get("enabled")
+            ):
                 continue
             role = source.get("role")
             source_client = source.get("client")
@@ -103,19 +112,30 @@ class MixinScan:
             if source_client != client:
                 continue
             items.append(source)
-        items.sort(key=lambda item: (str(item.get("path")), str(item.get("source_scope"))))
+        items.sort(
+            key=lambda item: (str(item.get("path")), str(item.get("source_scope")))
+        )
         return items
 
-    def _client_source_roots(self, client: str, client_config: Dict[str, object]) -> List[Dict[str, str]]:
+    def _client_source_roots(
+        self, client: str, client_config: Dict[str, object]
+    ) -> List[Dict[str, str]]:
         scan_sources = self.load_scan_sources()
         roots = []
         seen = set()
-        for source in self._scan_sources_for_client(client, scan_sources=scan_sources, enabled_only=True):
+        for source in self._scan_sources_for_client(
+            client, scan_sources=scan_sources, enabled_only=True
+        ):
             path = str(source.get("path"))
             if path in seen:
                 continue
             seen.add(path)
-            roots.append({"path": path, "scope": str(source.get("source_scope") or "client_live")})
+            roots.append(
+                {
+                    "path": path,
+                    "scope": str(source.get("source_scope") or "client_live"),
+                }
+            )
         if not roots:
             target_dir = str(Path(client_config["target_dir"]))
             roots.append({"path": target_dir, "scope": "target_dir"})
@@ -165,9 +185,13 @@ class MixinScan:
     ) -> Dict[str, object]:
         normalized_path = self._normalize_scan_source_path(path)
         if role not in SCAN_SOURCE_ROLES:
-            raise ValueError("scan source role must be one of {}".format(sorted(SCAN_SOURCE_ROLES)))
+            raise ValueError(
+                "scan source role must be one of {}".format(sorted(SCAN_SOURCE_ROLES))
+            )
         if path_kind not in SCAN_SOURCE_KINDS:
-            raise ValueError("scan source kind must be one of {}".format(sorted(SCAN_SOURCE_KINDS)))
+            raise ValueError(
+                "scan source kind must be one of {}".format(sorted(SCAN_SOURCE_KINDS))
+            )
         if role in {"client_live", "both"} and not client:
             raise ValueError("client_live/both scan source requires a client")
         if client:
@@ -189,7 +213,9 @@ class MixinScan:
         self.save_scan_sources(scan_sources)
         return self._scan_source_payload(entry)
 
-    def scan_source_update(self, source_id: str, **changes: object) -> Dict[str, object]:
+    def scan_source_update(
+        self, source_id: str, **changes: object
+    ) -> Dict[str, object]:
         scan_sources = self.load_scan_sources()
         source = scan_sources.get("sources", {}).get(source_id)
         if not source:
@@ -199,13 +225,23 @@ class MixinScan:
         if "role" in changes and changes["role"] is not None:
             role = str(changes["role"])
             if role not in SCAN_SOURCE_ROLES:
-                raise ValueError("scan source role must be one of {}".format(sorted(SCAN_SOURCE_ROLES)))
+                raise ValueError(
+                    "scan source role must be one of {}".format(
+                        sorted(SCAN_SOURCE_ROLES)
+                    )
+                )
             source["role"] = role
-            source["source_scope"] = "global_source" if role == "global_source" else "client_live"
+            source["source_scope"] = (
+                "global_source" if role == "global_source" else "client_live"
+            )
         if "path_kind" in changes and changes["path_kind"] is not None:
             path_kind = str(changes["path_kind"])
             if path_kind not in SCAN_SOURCE_KINDS:
-                raise ValueError("scan source kind must be one of {}".format(sorted(SCAN_SOURCE_KINDS)))
+                raise ValueError(
+                    "scan source kind must be one of {}".format(
+                        sorted(SCAN_SOURCE_KINDS)
+                    )
+                )
             source["path_kind"] = path_kind
         if "client" in changes:
             source["client"] = changes["client"]
@@ -217,7 +253,9 @@ class MixinScan:
             source["suggested"] = bool(changes["suggested"])
         if "notes" in changes and changes["notes"] is not None:
             source["notes"] = str(changes["notes"])
-        source["id"] = scan_source_id(str(source["path"]), str(source["role"]), source.get("client"))
+        source["id"] = scan_source_id(
+            str(source["path"]), str(source["role"]), source.get("client")
+        )
         scan_sources["sources"].pop(source_id, None)
         scan_sources["sources"][source["id"]] = source
         self.save_scan_sources(scan_sources)
@@ -237,9 +275,13 @@ class MixinScan:
     def scan_source_disable(self, source_id: str) -> Dict[str, object]:
         return self.scan_source_update(source_id, enabled=False)
 
-    def _scan_source_skill_entries(self, source: Dict[str, object]) -> List[Dict[str, object]]:
+    def _scan_source_skill_entries(
+        self, source: Dict[str, object]
+    ) -> List[Dict[str, object]]:
         source_path = Path(str(source.get("path")))
-        entries = self._discover_skill_entries(source_path, str(source.get("source_scope") or "global_source"))
+        entries = self._discover_skill_entries(
+            source_path, str(source.get("source_scope") or "global_source")
+        )
         for entry in entries:
             entry["path_kind"] = source.get("path_kind")
             entry["role"] = source.get("role")
@@ -257,7 +299,9 @@ class MixinScan:
                 continue
             candidates.append(source)
         if source_id and not candidates:
-            raise FileNotFoundError("Unknown enabled scan source '{}'".format(source_id))
+            raise FileNotFoundError(
+                "Unknown enabled scan source '{}'".format(source_id)
+            )
 
         results = []
         for source in candidates:
@@ -268,10 +312,20 @@ class MixinScan:
                     self.import_skill_dir(
                         Path(item["path"]),
                         source_type="local-scan",
-                        source_locator="scan-source:{}:{}".format(source["id"], item["path"]),
+                        source_locator="scan-source:{}:{}".format(
+                            source["id"], item["path"]
+                        ),
                         source_version="local",
-                        prefer_client=(str(source.get("client")) if source.get("role") == "both" and source.get("client") else None),
-                        source_client=(str(source.get("client")) if source.get("role") == "both" and source.get("client") else None),
+                        prefer_client=(
+                            str(source.get("client"))
+                            if source.get("role") == "both" and source.get("client")
+                            else None
+                        ),
+                        source_client=(
+                            str(source.get("client"))
+                            if source.get("role") == "both" and source.get("client")
+                            else None
+                        ),
                         source_scope=str(source.get("source_scope") or "global_source"),
                         source_root=str(source.get("path")),
                     )
@@ -296,11 +350,13 @@ class MixinScan:
 
     def _acquire_lock(self, operation: str) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)
-        lock_data = json.dumps({
-            "operation": operation,
-            "pid": os.getpid(),
-            "created_at": utc_now(),
-        })
+        lock_data = json.dumps(
+            {
+                "operation": operation,
+                "pid": os.getpid(),
+                "created_at": utc_now(),
+            }
+        )
         try:
             fd = os.open(str(self.lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             try:
@@ -308,7 +364,9 @@ class MixinScan:
             finally:
                 os.close(fd)
         except FileExistsError:
-            raise RuntimeError("SkillPool is locked by another operation: {}".format(self.lock_path))
+            raise RuntimeError(
+                "SkillPool is locked by another operation: {}".format(self.lock_path)
+            )
 
     def _release_lock(self) -> None:
         try:
@@ -340,7 +398,9 @@ class MixinScan:
         unique = sorted(set(found), key=lambda item: len(item.parts))
         filtered = []
         for skill_dir in unique:
-            if any(str(skill_dir).startswith(str(existing) + "\\") for existing in filtered):
+            if any(
+                str(skill_dir).startswith(str(existing) + "\\") for existing in filtered
+            ):
                 continue
             filtered.append(skill_dir)
         return filtered
@@ -402,13 +462,21 @@ class MixinScan:
             }
             registry["skills"][skill_id] = skill
         skill["files_path"] = str(destination)
-        skill["source_client"] = source_client or prefer_client or skill.get("source_client")
+        skill["source_client"] = (
+            source_client or prefer_client or skill.get("source_client")
+        )
         skill["source_scope"] = source_scope or skill.get("source_scope", "imported")
-        skill["source_root"] = source_root or skill.get("source_root") or str(skill_dir.parent)
+        skill["source_root"] = (
+            source_root or skill.get("source_root") or str(skill_dir.parent)
+        )
         skill["last_seen_at"] = utc_now()
         skill["missing_from_source"] = False
         available_clients = skill.setdefault("available_clients", [])
-        if prefer_client and available_clients and prefer_client not in available_clients:
+        if (
+            prefer_client
+            and available_clients
+            and prefer_client not in available_clients
+        ):
             available_clients.append(prefer_client)
         existing_sources = skill.setdefault("sources", [])
         source_record = {
@@ -423,7 +491,9 @@ class MixinScan:
         if source_record not in existing_sources:
             existing_sources.append(source_record)
         if prefer_client:
-            skill.setdefault("client_overrides", {})[prefer_client] = "prefer:{}".format(skill_id)
+            skill.setdefault("client_overrides", {})[prefer_client] = (
+                "prefer:{}".format(skill_id)
+            )
         self.save_registry(registry)
         self._refresh_statuses(registry, self.load_clients())
         return {
@@ -440,13 +510,20 @@ class MixinScan:
         clients = self.load_clients()
         scan_sources = self.load_scan_sources()
         for skill in registry.get("skills", {}).values():
-            if skill.get("source_scope") in ("target_dir", "extra_dir", "client_live", "global_source"):
+            if skill.get("source_scope") in (
+                "target_dir",
+                "extra_dir",
+                "client_live",
+                "global_source",
+            ):
                 skill["missing_from_source"] = True
         self.save_registry(registry)
         for client, client_config in clients["clients"].items():
             client_config["extra_dirs"] = [
                 str(source["path"])
-                for source in self._scan_sources_for_client(client, scan_sources=scan_sources, enabled_only=True)
+                for source in self._scan_sources_for_client(
+                    client, scan_sources=scan_sources, enabled_only=True
+                )
                 if str(source.get("source_scope")) == "extra_dir"
             ]
             clients["clients"][client] = client_config
@@ -468,10 +545,20 @@ class MixinScan:
                 self.import_skill_dir(
                     Path(item["path"]),
                     source_type="local-scan",
-                    source_locator="scan-source:{}:{}".format(source["id"], item["path"]),
+                    source_locator="scan-source:{}:{}".format(
+                        source["id"], item["path"]
+                    ),
                     source_version="local",
-                    prefer_client=(str(source.get("client")) if source.get("role") == "both" and source.get("client") else None),
-                    source_client=(str(source.get("client")) if source.get("role") == "both" and source.get("client") else None),
+                    prefer_client=(
+                        str(source.get("client"))
+                        if source.get("role") == "both" and source.get("client")
+                        else None
+                    ),
+                    source_client=(
+                        str(source.get("client"))
+                        if source.get("role") == "both" and source.get("client")
+                        else None
+                    ),
                     source_scope=str(source.get("source_scope") or "global_source"),
                     source_root=str(source.get("path")),
                 )
@@ -480,6 +567,3 @@ class MixinScan:
         self.generate_reports()
         self.refresh_discovery_cache()
         return results
-
-
-

@@ -20,6 +20,7 @@ from skillpool_app.core import (
     yaml_scalar,
 )
 
+
 class MixinMcp:
     """Mixin: _parse_toml_value, _normalize_mcp_servers, _parse_codex_mcp_config, _parse_claude_mcp_config, _parse_hermes_mcp_config..."""
 
@@ -33,6 +34,7 @@ class MixinMcp:
         # Try tomllib first (Python 3.11+)
         try:
             import tomllib
+
             return tomllib.loads("v = {}".format(value)).get("v", value)
         except Exception:
             pass
@@ -45,7 +47,9 @@ class MixinMcp:
             pass
         return value.strip("'\"")
 
-    def _normalize_mcp_servers(self, raw_servers: Dict[str, object], source_file: Path, source_kind: str) -> List[Dict[str, object]]:
+    def _normalize_mcp_servers(
+        self, raw_servers: Dict[str, object], source_file: Path, source_kind: str
+    ) -> List[Dict[str, object]]:
         servers = []
         for index, (name, config) in enumerate(raw_servers.items()):
             if not isinstance(config, dict):
@@ -75,7 +79,9 @@ class MixinMcp:
     def _parse_codex_mcp_config(self, config_path: Path) -> List[Dict[str, object]]:
         return self._load_codex_mcp_document(config_path)["entries"]
 
-    def _parse_claude_mcp_config(self, config_path: Path, source_kind: str) -> List[Dict[str, object]]:
+    def _parse_claude_mcp_config(
+        self, config_path: Path, source_kind: str
+    ) -> List[Dict[str, object]]:
         payload = json.loads(config_path.read_text(encoding="utf-8-sig"))
         if "mcpServers" in payload and isinstance(payload["mcpServers"], dict):
             raw_servers = payload["mcpServers"]
@@ -92,7 +98,9 @@ class MixinMcp:
         current_server: Optional[str] = None
         current_key: Optional[str] = None
         inside_section = False
-        for raw_line in config_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        for raw_line in config_path.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines():
             line = raw_line.rstrip()
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
@@ -113,7 +121,9 @@ class MixinMcp:
                 continue
             if indent >= 4 and stripped.startswith("- "):
                 if current_key == "args":
-                    servers[current_server].setdefault("args", []).append(stripped[2:].strip().strip("'\""))
+                    servers[current_server].setdefault("args", []).append(
+                        stripped[2:].strip().strip("'\"")
+                    )
                 continue
             if indent >= 4 and ":" in stripped:
                 key, value = stripped.split(":", 1)
@@ -168,7 +178,11 @@ class MixinMcp:
                 if current_server is not None and "=" in stripped:
                     key, value = [part.strip() for part in stripped.split("=", 1)]
                     if key in {"command", "args", "enabled"}:
-                        if key == "args" and value.startswith("[") and not value.rstrip().endswith("]"):
+                        if (
+                            key == "args"
+                            and value.startswith("[")
+                            and not value.rstrip().endswith("]")
+                        ):
                             collected = [value]
                             index += 1
                             while index < len(lines):
@@ -189,7 +203,9 @@ class MixinMcp:
             "entries": self._normalize_mcp_servers(servers, config_path, "root"),
         }
 
-    def _render_codex_mcp_document(self, document: Dict[str, object], entries: List[Dict[str, object]]) -> str:
+    def _render_codex_mcp_document(
+        self, document: Dict[str, object], entries: List[Dict[str, object]]
+    ) -> str:
         lines = list(document["preserved_lines"])
         if lines and lines[-1].strip():
             lines.append("")
@@ -197,9 +213,18 @@ class MixinMcp:
             lines.extend(
                 [
                     "[mcp_servers.{}]".format(entry["name"]),
-                    "command = {}".format(json.dumps(str(entry["command"] or ""), ensure_ascii=False)),
-                    "args = {}".format(json.dumps([str(item) for item in entry.get("args", [])], ensure_ascii=False)),
-                    "enabled = {}".format("true" if entry.get("enabled", True) else "false"),
+                    "command = {}".format(
+                        json.dumps(str(entry["command"] or ""), ensure_ascii=False)
+                    ),
+                    "args = {}".format(
+                        json.dumps(
+                            [str(item) for item in entry.get("args", [])],
+                            ensure_ascii=False,
+                        )
+                    ),
+                    "enabled = {}".format(
+                        "true" if entry.get("enabled", True) else "false"
+                    ),
                     "",
                 ]
             )
@@ -232,7 +257,9 @@ class MixinMcp:
             "entries": self._normalize_mcp_servers(raw_servers, config_path, "root"),
         }
 
-    def _render_claude_mcp_document(self, document: Dict[str, object], entries: List[Dict[str, object]]) -> str:
+    def _render_claude_mcp_document(
+        self, document: Dict[str, object], entries: List[Dict[str, object]]
+    ) -> str:
         mapping = {}
         for entry in entries:
             mapping[entry["name"]] = {
@@ -285,7 +312,9 @@ class MixinMcp:
                     continue
                 if indent >= 4 and stripped.startswith("- "):
                     if current_key == "args":
-                        servers[current_server].setdefault("args", []).append(stripped[2:].strip().strip("'\""))
+                        servers[current_server].setdefault("args", []).append(
+                            stripped[2:].strip().strip("'\"")
+                        )
                     continue
                 if indent >= 4 and ":" in stripped:
                     key, value = stripped.split(":", 1)
@@ -317,18 +346,26 @@ class MixinMcp:
             "entries": self._normalize_mcp_servers(servers, config_path, "root"),
         }
 
-    def _render_hermes_mcp_document(self, document: Dict[str, object], entries: List[Dict[str, object]]) -> str:
+    def _render_hermes_mcp_document(
+        self, document: Dict[str, object], entries: List[Dict[str, object]]
+    ) -> str:
         lines = list(document["before_lines"])
         if lines and lines[-1].strip():
             lines.append("")
         lines.append("mcp_servers:")
         for entry in entries:
             lines.append("  {}:".format(entry["name"]))
-            lines.append("    command: {}".format(yaml_scalar(entry.get("command") or "")))
+            lines.append(
+                "    command: {}".format(yaml_scalar(entry.get("command") or ""))
+            )
             lines.append("    args:")
             for arg in entry.get("args", []):
                 lines.append("      - {}".format(yaml_scalar(arg)))
-            lines.append("    enabled: {}".format("true" if entry.get("enabled", True) else "false"))
+            lines.append(
+                "    enabled: {}".format(
+                    "true" if entry.get("enabled", True) else "false"
+                )
+            )
         if document["after_lines"]:
             if lines and lines[-1].strip():
                 lines.append("")
@@ -338,7 +375,11 @@ class MixinMcp:
     def _mcp_semantic_key(self, entry: Dict[str, object]) -> str:
         command = str(entry.get("command") or "")
         args = [str(item) for item in entry.get("args") or []]
-        if command.lower() in {"cmd", "cmd.exe"} and len(args) >= 2 and args[0].lower() == "/c":
+        if (
+            command.lower() in {"cmd", "cmd.exe"}
+            and len(args) >= 2
+            and args[0].lower() == "/c"
+        ):
             command = args[1]
             args = args[2:]
         return "{}\0{}".format(command, json.dumps(args, ensure_ascii=False))
@@ -346,7 +387,9 @@ class MixinMcp:
     def _base_mcp_name(self, name: str) -> str:
         return re.sub(r"-\d+$", "", name or "")
 
-    def _annotate_mcp_entries(self, entries: List[Dict[str, object]]) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+    def _annotate_mcp_entries(
+        self, entries: List[Dict[str, object]]
+    ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
         annotated = []
         groups: Dict[str, List[Dict[str, object]]] = {}
         for entry in entries:
@@ -363,7 +406,9 @@ class MixinMcp:
             base_names = {self._base_mcp_name(item["name"]) for item in group_entries}
             preferred_name = None
             for base_name in sorted(base_names):
-                if any(item["name"] == base_name for item in group_entries) and any(item["name"] != base_name for item in group_entries):
+                if any(item["name"] == base_name for item in group_entries) and any(
+                    item["name"] != base_name for item in group_entries
+                ):
                     preferred_name = base_name
                     break
             if preferred_name is None:
@@ -371,14 +416,20 @@ class MixinMcp:
             group_id = preferred_name
             for item in group_entries:
                 item["duplicate_group"] = group_id
-                item["notes"] = list(item.get("notes", [])) + ["与其他 server 的 command + args 完全一致。"]
+                item["notes"] = list(item.get("notes", [])) + [
+                    "与其他 server 的 command + args 完全一致。"
+                ]
             duplicate_groups.append(
                 {
                     "group_id": group_id,
                     "preferred_name": preferred_name,
                     "names": [item["name"] for item in group_entries],
-                    "managed_names": [item["name"] for item in group_entries if item.get("managed")],
-                    "source_kinds": sorted({item["source_kind"] for item in group_entries}),
+                    "managed_names": [
+                        item["name"] for item in group_entries if item.get("managed")
+                    ],
+                    "source_kinds": sorted(
+                        {item["source_kind"] for item in group_entries}
+                    ),
                     "command": group_entries[0].get("command"),
                     "args": list(group_entries[0].get("args") or []),
                 }
@@ -386,7 +437,14 @@ class MixinMcp:
         duplicate_groups.sort(key=lambda item: item["group_id"])
         return annotated, duplicate_groups
 
-    def _unsupported_mcp_payload(self, client: str, notes: List[str], *, source_status: str = "unsupported_source", source_files: Optional[List[str]] = None) -> Dict[str, object]:
+    def _unsupported_mcp_payload(
+        self,
+        client: str,
+        notes: List[str],
+        *,
+        source_status: str = "unsupported_source",
+        source_files: Optional[List[str]] = None,
+    ) -> Dict[str, object]:
         return {
             "client": client,
             "source_status": source_status,
@@ -405,7 +463,9 @@ class MixinMcp:
             "last_diff": None,
         }
 
-    def _mcp_payload_for_client(self, client: str, client_config: Dict[str, object]) -> Dict[str, object]:
+    def _mcp_payload_for_client(
+        self, client: str, client_config: Dict[str, object]
+    ) -> Dict[str, object]:
         mcp_mode = client_config.get("mcp_mode", "unsupported")
         mcp_config_path = client_config.get("mcp_config_path")
         plugin_cache_dir = client_config.get("plugin_cache_dir")
@@ -414,7 +474,9 @@ class MixinMcp:
         if mcp_mode == "unsupported":
             return self._unsupported_mcp_payload(
                 client,
-                ["当前未发现稳定的标准 MCP server registry 配置源，暂不输出 MCP 数量。"],
+                [
+                    "当前未发现稳定的标准 MCP server registry 配置源，暂不输出 MCP 数量。"
+                ],
             )
 
         config_path = Path(mcp_config_path) if mcp_config_path else None
@@ -451,10 +513,16 @@ class MixinMcp:
                     for plugin_file in sorted(plugin_root.rglob(".mcp.json")):
                         source_files.append(str(plugin_file))
                         try:
-                            plugin_servers.extend(self._parse_claude_mcp_config(plugin_file, "plugin_cache"))
+                            plugin_servers.extend(
+                                self._parse_claude_mcp_config(
+                                    plugin_file, "plugin_cache"
+                                )
+                            )
                         except Exception:
                             continue
-                notes = ["已读取 Claude 根 .mcp.json，并用插件缓存中的 .mcp.json 作为补充来源。"]
+                notes = [
+                    "已读取 Claude 根 .mcp.json，并用插件缓存中的 .mcp.json 作为补充来源。"
+                ]
             elif mcp_mode == "hermes-yaml":
                 root_servers = self._load_hermes_mcp_document(config_path)["entries"]
                 plugin_servers = []
@@ -483,10 +551,18 @@ class MixinMcp:
             )
             return payload
 
-        annotated, duplicate_groups = self._annotate_mcp_entries(root_servers + plugin_servers)
+        annotated, duplicate_groups = self._annotate_mcp_entries(
+            root_servers + plugin_servers
+        )
         root_names = {entry["name"] for entry in root_servers}
-        root_entries = [entry for entry in annotated if entry["name"] in root_names and entry["source_kind"] == "root"]
-        plugin_entries = [entry for entry in annotated if entry["source_kind"] != "root"]
+        root_entries = [
+            entry
+            for entry in annotated
+            if entry["name"] in root_names and entry["source_kind"] == "root"
+        ]
+        plugin_entries = [
+            entry for entry in annotated if entry["source_kind"] != "root"
+        ]
         return {
             "client": client,
             "source_status": "ok",
@@ -506,7 +582,9 @@ class MixinMcp:
             "last_diff": mcp_state.get("last_diff"),
         }
 
-    def _load_editable_mcp_document(self, client: str, client_config: Dict[str, object]) -> Dict[str, object]:
+    def _load_editable_mcp_document(
+        self, client: str, client_config: Dict[str, object]
+    ) -> Dict[str, object]:
         mcp_mode = client_config.get("mcp_mode")
         config_path = Path(client_config["mcp_config_path"])
         if mcp_mode == "codex-toml":
@@ -515,9 +593,17 @@ class MixinMcp:
             return self._load_claude_mcp_document(config_path)
         if mcp_mode == "hermes-yaml":
             return self._load_hermes_mcp_document(config_path)
-        raise RuntimeError("Client '{}' does not support writable MCP configuration".format(client))
+        raise RuntimeError(
+            "Client '{}' does not support writable MCP configuration".format(client)
+        )
 
-    def _render_editable_mcp_document(self, client: str, client_config: Dict[str, object], document: Dict[str, object], entries: List[Dict[str, object]]) -> str:
+    def _render_editable_mcp_document(
+        self,
+        client: str,
+        client_config: Dict[str, object],
+        document: Dict[str, object],
+        entries: List[Dict[str, object]],
+    ) -> str:
         mcp_mode = client_config.get("mcp_mode")
         if mcp_mode == "codex-toml":
             return self._render_codex_mcp_document(document, entries)
@@ -525,9 +611,19 @@ class MixinMcp:
             return self._render_claude_mcp_document(document, entries)
         if mcp_mode == "hermes-yaml":
             return self._render_hermes_mcp_document(document, entries)
-        raise RuntimeError("Client '{}' does not support writable MCP configuration".format(client))
+        raise RuntimeError(
+            "Client '{}' does not support writable MCP configuration".format(client)
+        )
 
-    def _mcp_diff_payload(self, client: str, before_text: str, after_text: str, *, from_label: str, to_label: str) -> Dict[str, object]:
+    def _mcp_diff_payload(
+        self,
+        client: str,
+        before_text: str,
+        after_text: str,
+        *,
+        from_label: str,
+        to_label: str,
+    ) -> Dict[str, object]:
         diff_lines = list(
             difflib.unified_diff(
                 before_text.splitlines(),
@@ -537,8 +633,16 @@ class MixinMcp:
                 lineterm="",
             )
         )
-        added_count = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
-        removed_count = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
+        added_count = sum(
+            1
+            for line in diff_lines
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        removed_count = sum(
+            1
+            for line in diff_lines
+            if line.startswith("-") and not line.startswith("---")
+        )
         return {
             "client": client,
             "text": "\n".join(diff_lines),
@@ -547,8 +651,14 @@ class MixinMcp:
             "removed_count": removed_count,
         }
 
-    def _backup_mcp_config(self, client: str, config_path: Path, original_text: str, operation: str) -> Tuple[str, Path]:
-        backup_id = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "-" + secrets.token_hex(4)
+    def _backup_mcp_config(
+        self, client: str, config_path: Path, original_text: str, operation: str
+    ) -> Tuple[str, Path]:
+        backup_id = (
+            datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+            + "-"
+            + secrets.token_hex(4)
+        )
         backup_dir = self.backups_dir / backup_id / "mcp" / client
         backup_dir.mkdir(parents=True, exist_ok=True)
         (backup_dir / config_path.name).write_text(original_text, encoding="utf-8")
@@ -563,7 +673,16 @@ class MixinMcp:
         )
         return backup_id, backup_dir
 
-    def _write_mcp_state(self, client: str, *, backup_id: Optional[str], backup_dir: Optional[Path], operation: str, summary: str, diff_payload: Dict[str, object]) -> None:
+    def _write_mcp_state(
+        self,
+        client: str,
+        *,
+        backup_id: Optional[str],
+        backup_dir: Optional[Path],
+        operation: str,
+        summary: str,
+        diff_payload: Dict[str, object],
+    ) -> None:
         mcp_state = self.load_mcp_state()
         mcp_state.setdefault("clients", {})[client] = {
             "last_changed_at": utc_now(),
@@ -575,7 +694,9 @@ class MixinMcp:
         }
         self.save_mcp_state(mcp_state)
 
-    def _managed_mcp_entries(self, payload: Dict[str, object]) -> List[Dict[str, object]]:
+    def _managed_mcp_entries(
+        self, payload: Dict[str, object]
+    ) -> List[Dict[str, object]]:
         return [dict(entry) for entry in payload.get("root_servers", [])]
 
     def mcp_list(self, client: str) -> Dict[str, object]:
@@ -615,12 +736,16 @@ class MixinMcp:
             )
         return {"clients": items}
 
-    def _apply_mcp_mutation(self, client: str, operation: str, mutator) -> Dict[str, object]:
+    def _apply_mcp_mutation(
+        self, client: str, operation: str, mutator
+    ) -> Dict[str, object]:
         clients = self.load_clients()
         client_config = self._require_client(client, clients)
         payload = self._mcp_payload_for_client(client, client_config)
         if payload["source_status"] != "ok" or not payload["writable"]:
-            raise RuntimeError("Client '{}' does not support writable MCP configuration".format(client))
+            raise RuntimeError(
+                "Client '{}' does not support writable MCP configuration".format(client)
+            )
 
         config_path = Path(client_config["mcp_config_path"])
         document = self._load_editable_mcp_document(client, client_config)
@@ -629,16 +754,33 @@ class MixinMcp:
         if updated_entries is None:
             updated_entries = entries
         before_text = document["original_text"]
-        after_text = self._render_editable_mcp_document(client, client_config, document, updated_entries)
-        diff_payload = self._mcp_diff_payload(client, before_text, after_text, from_label="before", to_label="after")
+        after_text = self._render_editable_mcp_document(
+            client, client_config, document, updated_entries
+        )
+        diff_payload = self._mcp_diff_payload(
+            client, before_text, after_text, from_label="before", to_label="after"
+        )
 
         backup_id = None
         backup_dir = None
         if before_text != after_text:
-            backup_id, backup_dir = self._backup_mcp_config(client, config_path, before_text, operation)
-            encoding = "utf-8-sig" if client_config.get("mcp_mode") == "claude-json" else "utf-8"
+            backup_id, backup_dir = self._backup_mcp_config(
+                client, config_path, before_text, operation
+            )
+            encoding = (
+                "utf-8-sig"
+                if client_config.get("mcp_mode") == "claude-json"
+                else "utf-8"
+            )
             config_path.write_text(after_text, encoding=encoding)
-        self._write_mcp_state(client, backup_id=backup_id, backup_dir=backup_dir, operation=operation, summary=summary, diff_payload=diff_payload)
+        self._write_mcp_state(
+            client,
+            backup_id=backup_id,
+            backup_dir=backup_dir,
+            operation=operation,
+            summary=summary,
+            diff_payload=diff_payload,
+        )
         self.generate_reports()
         return {
             "client": client,
@@ -651,7 +793,9 @@ class MixinMcp:
         }
 
     def mcp_enable(self, client: str, server_name: str) -> Dict[str, object]:
-        def _mutate(entries: List[Dict[str, object]]) -> Tuple[List[Dict[str, object]], str]:
+        def _mutate(
+            entries: List[Dict[str, object]],
+        ) -> Tuple[List[Dict[str, object]], str]:
             for entry in entries:
                 if entry["name"] == server_name:
                     entry["enabled"] = True
@@ -661,7 +805,9 @@ class MixinMcp:
         return self._apply_mcp_mutation(client, "enable", _mutate)
 
     def mcp_disable(self, client: str, server_name: str) -> Dict[str, object]:
-        def _mutate(entries: List[Dict[str, object]]) -> Tuple[List[Dict[str, object]], str]:
+        def _mutate(
+            entries: List[Dict[str, object]],
+        ) -> Tuple[List[Dict[str, object]], str]:
             for entry in entries:
                 if entry["name"] == server_name:
                     entry["enabled"] = False
@@ -670,11 +816,22 @@ class MixinMcp:
 
         return self._apply_mcp_mutation(client, "disable", _mutate)
 
-    def mcp_add(self, client: str, server_name: str, command: str, args: Optional[List[str]] = None, enabled: bool = True) -> Dict[str, object]:
-        def _mutate(entries: List[Dict[str, object]]) -> Tuple[List[Dict[str, object]], str]:
+    def mcp_add(
+        self,
+        client: str,
+        server_name: str,
+        command: str,
+        args: Optional[List[str]] = None,
+        enabled: bool = True,
+    ) -> Dict[str, object]:
+        def _mutate(
+            entries: List[Dict[str, object]],
+        ) -> Tuple[List[Dict[str, object]], str]:
             if any(entry["name"] == server_name for entry in entries):
                 raise ValueError("MCP server '{}' already exists".format(server_name))
-            next_index = max([entry.get("order_index", -1) for entry in entries] + [-1]) + 1
+            next_index = (
+                max([entry.get("order_index", -1) for entry in entries] + [-1]) + 1
+            )
             entries.append(
                 {
                     "name": server_name,
@@ -702,11 +859,19 @@ class MixinMcp:
         args: Optional[List[str]] = None,
         enabled: Optional[bool] = None,
     ) -> Dict[str, object]:
-        def _mutate(entries: List[Dict[str, object]]) -> Tuple[List[Dict[str, object]], str]:
-            target = next((entry for entry in entries if entry["name"] == server_name), None)
+        def _mutate(
+            entries: List[Dict[str, object]],
+        ) -> Tuple[List[Dict[str, object]], str]:
+            target = next(
+                (entry for entry in entries if entry["name"] == server_name), None
+            )
             if target is None:
                 raise ValueError("Unknown MCP server '{}'".format(server_name))
-            if new_name and new_name != server_name and any(entry["name"] == new_name for entry in entries):
+            if (
+                new_name
+                and new_name != server_name
+                and any(entry["name"] == new_name for entry in entries)
+            ):
                 raise ValueError("MCP server '{}' already exists".format(new_name))
             if new_name:
                 target["name"] = new_name
@@ -721,7 +886,9 @@ class MixinMcp:
         return self._apply_mcp_mutation(client, "update", _mutate)
 
     def mcp_remove(self, client: str, server_name: str) -> Dict[str, object]:
-        def _mutate(entries: List[Dict[str, object]]) -> Tuple[List[Dict[str, object]], str]:
+        def _mutate(
+            entries: List[Dict[str, object]],
+        ) -> Tuple[List[Dict[str, object]], str]:
             remaining = [entry for entry in entries if entry["name"] != server_name]
             if len(remaining) == len(entries):
                 raise ValueError("Unknown MCP server '{}'".format(server_name))
@@ -732,7 +899,9 @@ class MixinMcp:
     def mcp_dedupe_codex(self) -> Dict[str, object]:
         client = "codex"
 
-        def _mutate(entries: List[Dict[str, object]]) -> Tuple[List[Dict[str, object]], str]:
+        def _mutate(
+            entries: List[Dict[str, object]],
+        ) -> Tuple[List[Dict[str, object]], str]:
             groups: Dict[str, List[Dict[str, object]]] = {}
             for entry in entries:
                 groups.setdefault(self._mcp_semantic_key(entry), []).append(entry)
@@ -747,28 +916,44 @@ class MixinMcp:
                 preferred = None
                 for entry in group_entries:
                     base_name = self._base_mcp_name(entry["name"])
-                    if entry["name"] == base_name and any(other["name"] != base_name for other in group_entries):
+                    if entry["name"] == base_name and any(
+                        other["name"] != base_name for other in group_entries
+                    ):
                         preferred = entry
                         break
                 if preferred is None:
-                    preferred = sorted(group_entries, key=lambda item: item.get("order_index", 0))[0]
-                preferred["enabled"] = any(item.get("enabled") for item in group_entries)
+                    preferred = sorted(
+                        group_entries, key=lambda item: item.get("order_index", 0)
+                    )[0]
+                preferred["enabled"] = any(
+                    item.get("enabled") for item in group_entries
+                )
                 kept_entries.append(preferred)
-                removed_names.extend([entry["name"] for entry in group_entries if entry is not preferred])
+                removed_names.extend(
+                    [entry["name"] for entry in group_entries if entry is not preferred]
+                )
             kept_entries.sort(key=lambda item: item.get("order_index", 0))
-            return kept_entries, "Codex MCP 去重完成：修复 {} 组，移除 {}".format(fixed_groups, ", ".join(removed_names) or "0 项")
+            return kept_entries, "Codex MCP 去重完成：修复 {} 组，移除 {}".format(
+                fixed_groups, ", ".join(removed_names) or "0 项"
+            )
 
         return self._apply_mcp_mutation(client, "dedupe", _mutate)
 
-    def _merge_mcp_entries(self, entries: List[Dict[str, object]]) -> List[Dict[str, object]]:
+    def _merge_mcp_entries(
+        self, entries: List[Dict[str, object]]
+    ) -> List[Dict[str, object]]:
         merged: Dict[str, Dict[str, object]] = {}
         for entry in entries:
             existing = merged.get(entry["name"])
-            if existing is None or (existing["source_kind"] != "root" and entry["source_kind"] == "root"):
+            if existing is None or (
+                existing["source_kind"] != "root" and entry["source_kind"] == "root"
+            ):
                 merged[entry["name"]] = entry
         return [merged[name] for name in sorted(merged)]
 
-    def _inventory_mcp_for_client(self, client: str, client_config: Dict[str, object]) -> Dict[str, object]:
+    def _inventory_mcp_for_client(
+        self, client: str, client_config: Dict[str, object]
+    ) -> Dict[str, object]:
         payload = self._mcp_payload_for_client(client, client_config)
         servers = payload["servers"]
         server_count = payload["server_count"]
@@ -783,6 +968,3 @@ class MixinMcp:
             "servers": servers,
             "notes": payload["notes"],
         }
-
-
-

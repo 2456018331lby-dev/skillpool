@@ -135,7 +135,9 @@ class SkillPoolTests(unittest.TestCase):
                 data = json.dumps(body).encode("utf-8")
                 headers = dict(headers or {})
                 headers.setdefault("Content-Type", "application/json")
-        request = urllib.request.Request(base_url + path, data=data, method=method, headers=headers or {})
+        request = urllib.request.Request(
+            base_url + path, data=data, method=method, headers=headers or {}
+        )
         with urllib.request.urlopen(request) as response:
             return json.loads(response.read().decode("utf-8"))
 
@@ -240,12 +242,16 @@ class SkillPoolTests(unittest.TestCase):
         )
         clients = self.pool.load_clients()
         clients["clients"]["openclaw"]["config_path"] = str(openclaw_config)
-        clients["clients"]["openclaw"]["target_dir"] = str(self.temp_dir / "empty-target")
+        clients["clients"]["openclaw"]["target_dir"] = str(
+            self.temp_dir / "empty-target"
+        )
         self.pool.save_clients(clients)
         result = self.pool.scan_local()
         self.assertEqual(result["openclaw"], 1)
         registry = self.pool.load_registry()
-        skill = next(item for item in registry["skills"].values() if item["name"] == "Extra One")
+        skill = next(
+            item for item in registry["skills"].values() if item["name"] == "Extra One"
+        )
         self.assertEqual(skill["source_scope"], "extra_dir")
         self.assertEqual(skill["source_client"], "openclaw")
         self.assertIn("openclaw", skill["available_clients"])
@@ -267,10 +273,16 @@ class SkillPoolTests(unittest.TestCase):
         preview = self.pool.preview("openclaw", detailed=True)
         self.assertEqual(preview["status"], "safe")
         self.assertEqual(preview["diff_counts"]["added"], 1)
-        self.assertEqual(registry_before, self.pool.registry_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            registry_before, self.pool.registry_path.read_text(encoding="utf-8")
+        )
         clients = self.pool.load_clients()
-        self.assertEqual(clients["clients"]["openclaw"]["last_preview_status"], preview["status"])
-        self.assertEqual(clients["clients"]["openclaw"]["last_preview_at"], preview["generated_at"])
+        self.assertEqual(
+            clients["clients"]["openclaw"]["last_preview_status"], preview["status"]
+        )
+        self.assertEqual(
+            clients["clients"]["openclaw"]["last_preview_at"], preview["generated_at"]
+        )
         self.assertTrue((self.pool.publish_dir / "openclaw" / "preview.json").exists())
         self.assertTrue((self.pool.publish_dir / "openclaw" / "diff.json").exists())
 
@@ -282,13 +294,27 @@ class SkillPoolTests(unittest.TestCase):
         make_skill(live_dir, "beta-live", "Beta Live")
         make_skill(transient_dir, "temp-only", "Temp Only")
 
-        added_global = self.pool.scan_source_add(str(global_dir), role="global_source", path_kind="workspace")
-        added_live = self.pool.scan_source_add(str(live_dir), role="both", client="hermes", path_kind="workspace")
-        self.pool.scan_source_add(str(transient_dir), role="global_source", path_kind="transient", enabled=False, suggested=True)
+        added_global = self.pool.scan_source_add(
+            str(global_dir), role="global_source", path_kind="workspace"
+        )
+        added_live = self.pool.scan_source_add(
+            str(live_dir), role="both", client="hermes", path_kind="workspace"
+        )
+        self.pool.scan_source_add(
+            str(transient_dir),
+            role="global_source",
+            path_kind="transient",
+            enabled=False,
+            suggested=True,
+        )
 
         listed = self.pool.scan_sources_list()
-        self.assertTrue(any(item["id"] == added_global["id"] for item in listed["sources"]))
-        self.assertTrue(any(item["id"] == added_live["id"] for item in listed["sources"]))
+        self.assertTrue(
+            any(item["id"] == added_global["id"] for item in listed["sources"])
+        )
+        self.assertTrue(
+            any(item["id"] == added_live["id"] for item in listed["sources"])
+        )
 
         scan_result = self.pool.scan_sources_scan()
         self.assertGreaterEqual(scan_result["total"], 2)
@@ -298,12 +324,24 @@ class SkillPoolTests(unittest.TestCase):
         self.assertIn("Beta Live", names)
 
         inventory = self.pool.inventory("hermes", include_mcp=False)
-        self.assertTrue(any(item["path"] == str(live_dir) for item in inventory["skills"]["source_directories"]))
+        self.assertTrue(
+            any(
+                item["path"] == str(live_dir)
+                for item in inventory["skills"]["source_directories"]
+            )
+        )
         self.assertGreaterEqual(inventory["skills"]["live_total_count"], 1)
 
         discovery = self.pool.discovery()
-        self.assertTrue(any(item["path"] == str(transient_dir / "temp-only") for item in discovery["transient_only"]))
-        self.assertTrue(any(source["path"] == str(global_dir) for source in discovery["sources"]))
+        self.assertTrue(
+            any(
+                item["path"] == str(transient_dir / "temp-only")
+                for item in discovery["transient_only"]
+            )
+        )
+        self.assertTrue(
+            any(source["path"] == str(global_dir) for source in discovery["sources"])
+        )
 
     def test_skills_matrix_groups_logical_skills(self):
         source_root = self.temp_dir / "sources"
@@ -314,7 +352,12 @@ class SkillPoolTests(unittest.TestCase):
             source_version="main",
         )
         local = self.pool.import_skill_dir(
-            make_skill(source_root, "hermes/alpha-local", "Alpha Matrix", description="preferred for hermes"),
+            make_skill(
+                source_root,
+                "hermes/alpha-local",
+                "Alpha Matrix",
+                description="preferred for hermes",
+            ),
             source_type="local-scan",
             source_locator="hermes:alpha-local",
             source_version="local",
@@ -323,15 +366,29 @@ class SkillPoolTests(unittest.TestCase):
         self.pool.publish("hermes")
 
         matrix = self.pool.skills_matrix()
-        row = next(item for item in matrix["rows"] if item["conflict_family"] == "alpha-matrix")
+        row = next(
+            item for item in matrix["rows"] if item["conflict_family"] == "alpha-matrix"
+        )
         self.assertEqual(row["member_count"], 2)
         self.assertEqual(row["clients"]["hermes"]["status"], "published")
         self.assertEqual(row["clients"]["openclaw"]["status"], "pool_only")
-        self.assertTrue(any(instance["skill_id"] == shared["skill_id"] for instance in row["instances"]))
-        self.assertTrue(any(instance["skill_id"] == local["skill_id"] for instance in row["instances"]))
+        self.assertTrue(
+            any(
+                instance["skill_id"] == shared["skill_id"]
+                for instance in row["instances"]
+            )
+        )
+        self.assertTrue(
+            any(
+                instance["skill_id"] == local["skill_id"]
+                for instance in row["instances"]
+            )
+        )
         self.assertTrue(all(instance["fingerprint"] for instance in row["instances"]))
         self.assertTrue(all(instance["files_path"] for instance in row["instances"]))
-        self.assertTrue(any(item["type"] == "duplicate_across_clients" for item in row["anomalies"]))
+        self.assertTrue(
+            any(item["type"] == "duplicate_across_clients" for item in row["anomalies"])
+        )
 
     def test_system_status_and_tool_actions(self):
         original_run, original_console_online = self.patch_shortcut_subprocess()
@@ -373,7 +430,9 @@ class SkillPoolTests(unittest.TestCase):
         self.assertEqual(publish["published_count"], 1)
         target_dir = Path(self.clients["openclaw"]["target_dir"])
         self.assertTrue((target_dir / "alpha" / "SKILL.md").exists())
-        config = json.loads(Path(self.clients["openclaw"]["config_path"]).read_text(encoding="utf-8"))
+        config = json.loads(
+            Path(self.clients["openclaw"]["config_path"]).read_text(encoding="utf-8")
+        )
         self.assertEqual(config["skills"]["load"]["extraDirs"], [str(target_dir)])
         clients_state = self.pool.load_clients()
         self.assertEqual(
@@ -384,7 +443,9 @@ class SkillPoolTests(unittest.TestCase):
     def test_publish_skips_other_clients_local_skills(self):
         source_root = self.temp_dir / "sources"
         hermes_skill = make_skill(source_root, "hermes/only-hermes", "Only Hermes")
-        openclaw_skill = make_skill(source_root, "openclaw/only-openclaw", "Only OpenClaw")
+        openclaw_skill = make_skill(
+            source_root, "openclaw/only-openclaw", "Only OpenClaw"
+        )
         hermes_result = self.pool.import_skill_dir(
             hermes_skill,
             source_type="local-scan",
@@ -418,7 +479,9 @@ class SkillPoolTests(unittest.TestCase):
     def test_override_switches_conflict_choice(self):
         source_root = self.temp_dir / "sources"
         first = make_skill(source_root, "first/conflict", "Conflict Skill")
-        second = make_skill(source_root, "second/conflict-two", "Conflict Skill", description="other")
+        second = make_skill(
+            source_root, "second/conflict-two", "Conflict Skill", description="other"
+        )
         first_result = self.pool.import_skill_dir(
             first,
             source_type="local-scan",
@@ -441,9 +504,16 @@ class SkillPoolTests(unittest.TestCase):
             [second_result["skill_id"]],
         )
         registry = self.pool.load_registry()
-        self.assertEqual(registry["skills"][first_result["skill_id"]]["client_overrides"].get("hermes"), "inherit")
         self.assertEqual(
-            registry["skills"][second_result["skill_id"]]["client_overrides"].get("hermes"),
+            registry["skills"][first_result["skill_id"]]["client_overrides"].get(
+                "hermes"
+            ),
+            "inherit",
+        )
+        self.assertEqual(
+            registry["skills"][second_result["skill_id"]]["client_overrides"].get(
+                "hermes"
+            ),
             "prefer:{}".format(second_result["skill_id"]),
         )
 
@@ -461,10 +531,16 @@ class SkillPoolTests(unittest.TestCase):
         self.assertEqual(len(listed["overrides"]), 1)
         self.pool.override_disable("hermes", "alpha")
         registry = self.pool.load_registry()
-        self.assertEqual(registry["skills"][result["skill_id"]]["client_overrides"]["hermes"], "disabled")
+        self.assertEqual(
+            registry["skills"][result["skill_id"]]["client_overrides"]["hermes"],
+            "disabled",
+        )
         self.pool.override_inherit("hermes", "alpha")
         registry = self.pool.load_registry()
-        self.assertEqual(registry["skills"][result["skill_id"]]["client_overrides"]["hermes"], "inherit")
+        self.assertEqual(
+            registry["skills"][result["skill_id"]]["client_overrides"]["hermes"],
+            "inherit",
+        )
 
     def test_rollback_restores_previous_target(self):
         target_dir = Path(self.clients["openclaw"]["target_dir"])
@@ -531,12 +607,22 @@ class SkillPoolTests(unittest.TestCase):
         )
         preview = self.pool.preview("openclaw")
         clients = self.pool.load_clients()
-        self.assertEqual(clients["clients"]["openclaw"]["last_preview_status"], preview["status"])
-        self.assertEqual(clients["clients"]["openclaw"]["last_preview_at"], preview["generated_at"])
+        self.assertEqual(
+            clients["clients"]["openclaw"]["last_preview_status"], preview["status"]
+        )
+        self.assertEqual(
+            clients["clients"]["openclaw"]["last_preview_at"], preview["generated_at"]
+        )
         doctor = self.pool.doctor(deep=True, client="openclaw")
         clients = self.pool.load_clients()
-        self.assertEqual(clients["clients"]["openclaw"]["last_deep_doctor_status"], doctor["checks"][0]["status"])
-        self.assertEqual(clients["clients"]["openclaw"]["last_deep_doctor_at"], doctor["checks"][0]["generated_at"])
+        self.assertEqual(
+            clients["clients"]["openclaw"]["last_deep_doctor_status"],
+            doctor["checks"][0]["status"],
+        )
+        self.assertEqual(
+            clients["clients"]["openclaw"]["last_deep_doctor_at"],
+            doctor["checks"][0]["generated_at"],
+        )
 
     def test_list_skills_supports_pagination_sort_and_enabled_filter(self):
         source_root = self.temp_dir / "sources"
@@ -561,7 +647,9 @@ class SkillPoolTests(unittest.TestCase):
         )
         self.pool.set_enabled_global(beta["skill_id"], False)
 
-        page_one = self.pool.list_skills(page=1, page_size=1, sort_by="name", sort_dir="asc")
+        page_one = self.pool.list_skills(
+            page=1, page_size=1, sort_by="name", sort_dir="asc"
+        )
         self.assertEqual(page_one["total"], 3)
         self.assertEqual(page_one["page_size"], 1)
         self.assertEqual(page_one["total_pages"], 3)
@@ -581,7 +669,12 @@ class SkillPoolTests(unittest.TestCase):
             prefer_client="hermes",
         )
         second = self.pool.import_skill_dir(
-            make_skill(source_root, "second/conflict-two", "Conflict Skill", description="secondary variant"),
+            make_skill(
+                source_root,
+                "second/conflict-two",
+                "Conflict Skill",
+                description="secondary variant",
+            ),
             source_type="github",
             source_locator="repo#second",
             source_version="main",
@@ -604,7 +697,12 @@ class SkillPoolTests(unittest.TestCase):
             prefer_client="hermes",
         )
         self.pool.import_skill_dir(
-            make_skill(source_root, "second/conflict-two", "Conflict Skill", description="secondary variant"),
+            make_skill(
+                source_root,
+                "second/conflict-two",
+                "Conflict Skill",
+                description="secondary variant",
+            ),
             source_type="github",
             source_locator="repo#second",
             source_version="main",
@@ -648,7 +746,10 @@ class SkillPoolTests(unittest.TestCase):
                 {
                     "mcpServers": {
                         "root-server": {"command": "node", "args": ["root.js"]},
-                        "shared-server": {"command": "node", "args": ["root-shared.js"]},
+                        "shared-server": {
+                            "command": "node",
+                            "args": ["root-shared.js"],
+                        },
                     }
                 }
             ),
@@ -661,7 +762,10 @@ class SkillPoolTests(unittest.TestCase):
                 {
                     "mcpServers": {
                         "plugin-server": {"command": "node", "args": ["plugin.js"]},
-                        "shared-server": {"command": "node", "args": ["plugin-shared.js"]},
+                        "shared-server": {
+                            "command": "node",
+                            "args": ["plugin-shared.js"],
+                        },
                     }
                 }
             ),
@@ -672,7 +776,9 @@ class SkillPoolTests(unittest.TestCase):
         self.assertEqual(inventory["mcp"]["source_status"], "ok")
         self.assertEqual(inventory["mcp"]["server_count"], 3)
         servers = {item["name"]: item for item in inventory["mcp"]["servers"]}
-        self.assertEqual(servers["shared-server"]["source_file"], str(self.claude_mcp_path))
+        self.assertEqual(
+            servers["shared-server"]["source_file"], str(self.claude_mcp_path)
+        )
         self.assertEqual(servers["plugin-server"]["source_kind"], "plugin_cache")
 
     def test_inventory_hermes_parses_yaml_mcp(self):
@@ -699,7 +805,9 @@ class SkillPoolTests(unittest.TestCase):
         for client in ("openclaw", "qclaw", "autoclaw"):
             with self.subTest(client=client):
                 inventory = self.pool.inventory(client, include_skills=False)
-                self.assertEqual(inventory["mcp"]["source_status"], "unsupported_source")
+                self.assertEqual(
+                    inventory["mcp"]["source_status"], "unsupported_source"
+                )
                 self.assertIsNone(inventory["mcp"]["server_count"])
 
     def test_inventory_skills_reports_live_pool_published_and_source_mismatch(self):
@@ -719,7 +827,9 @@ class SkillPoolTests(unittest.TestCase):
             source_version="main",
         )
         self.pool.import_skill_dir(
-            make_skill(source_root, "pool/shared", "Shared Name", description="pool variant"),
+            make_skill(
+                source_root, "pool/shared", "Shared Name", description="pool variant"
+            ),
             source_type="github",
             source_locator="repo#shared-name",
             source_version="main",
@@ -735,8 +845,12 @@ class SkillPoolTests(unittest.TestCase):
         inventory = self.pool.inventory("openclaw", include_mcp=False)
         live_only_names = {item["name"] for item in inventory["skills"]["live_only"]}
         pool_only_names = {item["name"] for item in inventory["skills"]["pool_only"]}
-        published_only_names = {item["name"] for item in inventory["skills"]["published_only"]}
-        source_mismatch_names = {item["name"] for item in inventory["skills"]["source_mismatch"]}
+        published_only_names = {
+            item["name"] for item in inventory["skills"]["published_only"]
+        }
+        source_mismatch_names = {
+            item["name"] for item in inventory["skills"]["source_mismatch"]
+        }
 
         self.assertIn("Live Only", live_only_names)
         self.assertIn("Pool Only", pool_only_names)
@@ -753,7 +867,12 @@ class SkillPoolTests(unittest.TestCase):
         inventory = self.pool.inventory("openclaw", include_mcp=False)
         self.assertEqual(inventory["skills"]["live_extra_dir_count"], 1)
         self.assertEqual(inventory["skills"]["live_total_count"], 1)
-        self.assertTrue(any(item["path"] == str(extra_dir) for item in inventory["skills"]["source_directories"]))
+        self.assertTrue(
+            any(
+                item["path"] == str(extra_dir)
+                for item in inventory["skills"]["source_directories"]
+            )
+        )
 
     def test_mcp_write_codex_preserves_non_mcp_sections(self):
         self.codex_config_path.write_text(
@@ -786,10 +905,23 @@ class SkillPoolTests(unittest.TestCase):
 
     def test_mcp_write_claude_preserves_non_mcp_fields(self):
         self.claude_mcp_path.write_text(
-            json.dumps({"theme": "light", "mcpServers": {"alpha": {"command": "node", "args": ["alpha.js"], "enabled": True}}}),
+            json.dumps(
+                {
+                    "theme": "light",
+                    "mcpServers": {
+                        "alpha": {
+                            "command": "node",
+                            "args": ["alpha.js"],
+                            "enabled": True,
+                        }
+                    },
+                }
+            ),
             encoding="utf-8-sig",
         )
-        result = self.pool.mcp_add("claude", "beta", "node", args=["beta.js"], enabled=False)
+        result = self.pool.mcp_add(
+            "claude", "beta", "node", args=["beta.js"], enabled=False
+        )
         payload = json.loads(self.claude_mcp_path.read_text(encoding="utf-8-sig"))
         self.assertTrue(result["changed"])
         self.assertEqual(payload["theme"], "light")
@@ -868,7 +1000,12 @@ class SkillPoolTests(unittest.TestCase):
             prefer_client="hermes",
         )
         self.pool.import_skill_dir(
-            make_skill(source_root, "second/conflict-two", "Conflict Skill", description="secondary"),
+            make_skill(
+                source_root,
+                "second/conflict-two",
+                "Conflict Skill",
+                description="secondary",
+            ),
             source_type="github",
             source_locator="repo#second",
             source_version="main",
@@ -883,7 +1020,9 @@ class SkillPoolTests(unittest.TestCase):
 
     def test_inventory_export_returns_json_and_markdown(self):
         exported_json = self.pool.inventory_export(client="codex", format="json")
-        exported_markdown = self.pool.inventory_export(client="codex", format="markdown")
+        exported_markdown = self.pool.inventory_export(
+            client="codex", format="markdown"
+        )
         self.assertEqual(exported_json["format"], "json")
         self.assertIn('"client": "codex"', exported_json["content"])
         self.assertEqual(exported_markdown["format"], "markdown")
@@ -902,16 +1041,32 @@ class SkillPoolTests(unittest.TestCase):
         disabled = self.pool.batch_disable(["codex", "claude"], [family])
         self.assertEqual(disabled["changed_count"], 2)
         registry = self.pool.load_registry()
-        members = [item for item in registry["skills"].values() if item["conflict_family"] == family]
-        self.assertTrue(all(item["client_overrides"]["codex"] == "disabled" for item in members))
-        self.assertTrue(all(item["client_overrides"]["claude"] == "disabled" for item in members))
+        members = [
+            item
+            for item in registry["skills"].values()
+            if item["conflict_family"] == family
+        ]
+        self.assertTrue(
+            all(item["client_overrides"]["codex"] == "disabled" for item in members)
+        )
+        self.assertTrue(
+            all(item["client_overrides"]["claude"] == "disabled" for item in members)
+        )
 
         inherited = self.pool.batch_inherit(["codex", "claude"], [family])
         self.assertEqual(inherited["changed_count"], 2)
         registry = self.pool.load_registry()
-        members = [item for item in registry["skills"].values() if item["conflict_family"] == family]
-        self.assertTrue(all(item["client_overrides"]["codex"] == "inherit" for item in members))
-        self.assertTrue(all(item["client_overrides"]["claude"] == "inherit" for item in members))
+        members = [
+            item
+            for item in registry["skills"].values()
+            if item["conflict_family"] == family
+        ]
+        self.assertTrue(
+            all(item["client_overrides"]["codex"] == "inherit" for item in members)
+        )
+        self.assertTrue(
+            all(item["client_overrides"]["claude"] == "inherit" for item in members)
+        )
 
     def test_sync_preview_and_apply_sync_skill_and_supported_mcp(self):
         skill_root = self.temp_dir / "sync-source"
@@ -943,7 +1098,9 @@ class SkillPoolTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        preview = self.pool.sync_preview("codex", ["hermes"], include_skills=True, include_mcp=True)
+        preview = self.pool.sync_preview(
+            "codex", ["hermes"], include_skills=True, include_mcp=True
+        )
         self.assertEqual(preview["blocked_targets"], [])
         self.assertEqual(preview["skills_template"]["published_family_count"], 1)
         self.assertEqual(preview["skills_template"]["disabled_family_count"], 1)
@@ -951,17 +1108,41 @@ class SkillPoolTests(unittest.TestCase):
         self.assertEqual(preview["targets"][0]["skills"]["counts"]["prefer_exact"], 1)
         self.assertEqual(preview["targets"][0]["skills"]["counts"]["disabled"], 1)
 
-        applied = self.pool.sync_apply("codex", ["hermes"], include_skills=True, include_mcp=True)
+        applied = self.pool.sync_apply(
+            "codex", ["hermes"], include_skills=True, include_mcp=True
+        )
         result = applied["results"][0]
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["skills"]["changed_count"], 2)
-        self.assertTrue((Path(self.clients["hermes"]["target_dir"]) / "sync-shared" / "SKILL.md").exists())
+        self.assertTrue(
+            (
+                Path(self.clients["hermes"]["target_dir"]) / "sync-shared" / "SKILL.md"
+            ).exists()
+        )
 
         registry = self.pool.load_registry()
-        shared_members = [item for item in registry["skills"].values() if item["conflict_family"] == shared["conflict_family"]]
-        disabled_members = [item for item in registry["skills"].values() if item["conflict_family"] == disabled_skill["conflict_family"]]
-        self.assertTrue(all(item["client_overrides"]["hermes"] == f"prefer:{shared['skill_id']}" for item in shared_members))
-        self.assertTrue(all(item["client_overrides"]["hermes"] == "disabled" for item in disabled_members))
+        shared_members = [
+            item
+            for item in registry["skills"].values()
+            if item["conflict_family"] == shared["conflict_family"]
+        ]
+        disabled_members = [
+            item
+            for item in registry["skills"].values()
+            if item["conflict_family"] == disabled_skill["conflict_family"]
+        ]
+        self.assertTrue(
+            all(
+                item["client_overrides"]["hermes"] == f"prefer:{shared['skill_id']}"
+                for item in shared_members
+            )
+        )
+        self.assertTrue(
+            all(
+                item["client_overrides"]["hermes"] == "disabled"
+                for item in disabled_members
+            )
+        )
 
         hermes_mcp = self.pool.mcp_list("hermes")
         self.assertEqual(hermes_mcp["source_status"], "ok")
@@ -971,7 +1152,12 @@ class SkillPoolTests(unittest.TestCase):
     def test_sync_preview_marks_unresolved_and_unavailable_families(self):
         skill_root = self.temp_dir / "sync-conflicts"
         source_preferred = self.pool.import_skill_dir(
-            make_skill(skill_root, "codex/dual-source", "Dual Source", description="codex preferred"),
+            make_skill(
+                skill_root,
+                "codex/dual-source",
+                "Dual Source",
+                description="codex preferred",
+            ),
             source_type="local-scan",
             source_locator="codex:dual-source",
             source_version="local",
@@ -981,7 +1167,12 @@ class SkillPoolTests(unittest.TestCase):
             source_root=str(skill_root / "codex"),
         )
         self.pool.import_skill_dir(
-            make_skill(skill_root, "hermes/dual-target", "Dual Source", description="hermes variant"),
+            make_skill(
+                skill_root,
+                "hermes/dual-target",
+                "Dual Source",
+                description="hermes variant",
+            ),
             source_type="local-scan",
             source_locator="hermes:dual-target",
             source_version="local",
@@ -1002,18 +1193,38 @@ class SkillPoolTests(unittest.TestCase):
         )
         self.pool.publish("codex")
 
-        preview = self.pool.sync_preview("codex", ["hermes"], include_skills=True, include_mcp=False)
+        preview = self.pool.sync_preview(
+            "codex", ["hermes"], include_skills=True, include_mcp=False
+        )
         counts = preview["targets"][0]["skills"]["counts"]
         self.assertEqual(counts["unresolved_family"], 1)
         self.assertEqual(counts["unavailable_family"], 1)
         actions = preview["targets"][0]["skills"]["actions"]
-        self.assertTrue(any(item["skill_id"] == source_preferred["skill_id"] and item["action"] == "unresolved_family" for item in actions))
-        self.assertTrue(any(item["skill_id"] == unavailable["skill_id"] and item["action"] == "unavailable_family" for item in actions))
+        self.assertTrue(
+            any(
+                item["skill_id"] == source_preferred["skill_id"]
+                and item["action"] == "unresolved_family"
+                for item in actions
+            )
+        )
+        self.assertTrue(
+            any(
+                item["skill_id"] == unavailable["skill_id"]
+                and item["action"] == "unavailable_family"
+                for item in actions
+            )
+        )
 
     def test_discovery_summary_details_and_refresh_use_cache(self):
         transient_dir = self.temp_dir / "cached-discovery"
         make_skill(transient_dir, "temp-only", "Temp Only")
-        self.pool.scan_source_add(str(transient_dir), role="global_source", path_kind="transient", enabled=False, suggested=True)
+        self.pool.scan_source_add(
+            str(transient_dir),
+            role="global_source",
+            path_kind="transient",
+            enabled=False,
+            suggested=True,
+        )
         self.pool.scan_sources_scan()
 
         summary = self.pool.discovery_summary()
@@ -1038,7 +1249,9 @@ class SkillPoolTests(unittest.TestCase):
                 if path.is_file():
                     zf.write(str(path), str(path.relative_to(zip_root)))
         manifest = self.temp_dir / "batch.json"
-        manifest.write_text(json.dumps([{"type": "zip", "zip_path": str(archive)}]), encoding="utf-8")
+        manifest.write_text(
+            json.dumps([{"type": "zip", "zip_path": str(archive)}]), encoding="utf-8"
+        )
         result = self.pool.import_batch(manifest)
         self.assertEqual(len(result["results"]), 1)
         self.assertEqual(len(result["imported_skill_ids"]), 1)
@@ -1050,7 +1263,10 @@ class SkillPoolTests(unittest.TestCase):
         with zipfile.ZipFile(str(archive), "w") as zf:
             for path in source_root.rglob("*"):
                 if path.is_file():
-                    zf.write(str(path), str(Path("repo-root") / path.relative_to(source_root)))
+                    zf.write(
+                        str(path),
+                        str(Path("repo-root") / path.relative_to(source_root)),
+                    )
 
         original_urlopen = core_module.urllib.request.urlopen
 
@@ -1085,8 +1301,12 @@ class SkillPoolTests(unittest.TestCase):
         self.assertTrue(status["ok"])
         self.assertEqual(status["data"]["root"], str(self.pool.root))
         self.request_json(base_url, "/api/skills")
-        self.assertEqual(clients_before, self.pool.clients_path.read_text(encoding="utf-8"))
-        self.assertEqual(registry_before, self.pool.registry_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            clients_before, self.pool.clients_path.read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            registry_before, self.pool.registry_path.read_text(encoding="utf-8")
+        )
 
     def test_web_preview_matches_core_preview_shape(self):
         source_root = self.temp_dir / "sources"
@@ -1100,7 +1320,9 @@ class SkillPoolTests(unittest.TestCase):
         )
         expected = self.pool.preview("openclaw", detailed=True, persist=False)
         base_url = self.start_web_server()
-        response = self.request_json(base_url, "/api/clients/openclaw/preview?detailed=1")
+        response = self.request_json(
+            base_url, "/api/clients/openclaw/preview?detailed=1"
+        )
         self.assertTrue(response["ok"])
         self.assertEqual(response["data"]["client"], expected["client"])
         self.assertEqual(response["data"]["status"], expected["status"])
@@ -1110,7 +1332,9 @@ class SkillPoolTests(unittest.TestCase):
     def test_web_publish_blocked_when_preview_blocked(self):
         base_url = self.start_web_server()
         with self.assertRaises(urllib.error.HTTPError) as context:
-            self.request_json(base_url, "/api/clients/openclaw/publish", method="POST", body={})
+            self.request_json(
+                base_url, "/api/clients/openclaw/publish", method="POST", body={}
+            )
         self.assertEqual(context.exception.code, 409)
         payload = json.loads(context.exception.read().decode("utf-8"))
         self.assertFalse(payload["ok"])
@@ -1130,7 +1354,12 @@ class SkillPoolTests(unittest.TestCase):
         )
         self.pool.publish("openclaw")
         base_url = self.start_web_server()
-        response = self.request_json(base_url, "/api/clients/openclaw/rollback", method="POST", body={"latest": True})
+        response = self.request_json(
+            base_url,
+            "/api/clients/openclaw/rollback",
+            method="POST",
+            body={"latest": True},
+        )
         self.assertTrue(response["ok"])
         self.assertTrue((target_dir / "legacy-skill" / "SKILL.md").exists())
         self.assertFalse((target_dir / "new-skill" / "SKILL.md").exists())
@@ -1160,7 +1389,9 @@ class SkillPoolTests(unittest.TestCase):
             "/api/import/zip",
             method="POST",
             body=body,
-            headers={"Content-Type": "multipart/form-data; boundary={}".format(boundary)},
+            headers={
+                "Content-Type": "multipart/form-data; boundary={}".format(boundary)
+            },
         )
         self.assertTrue(response["ok"])
         self.assertEqual(len(response["data"]["imported_skill_ids"]), 1)
@@ -1181,7 +1412,9 @@ class SkillPoolTests(unittest.TestCase):
         )
         base_url = self.start_web_server()
 
-        listing = self.request_json(base_url, "/api/skills?page=1&page_size=1&sort_by=name&sort_dir=asc")
+        listing = self.request_json(
+            base_url, "/api/skills?page=1&page_size=1&sort_by=name&sort_dir=asc"
+        )
         self.assertTrue(listing["ok"])
         self.assertEqual(listing["data"]["page_size"], 1)
         self.assertEqual(listing["data"]["total_pages"], 2)
@@ -1203,7 +1436,12 @@ class SkillPoolTests(unittest.TestCase):
             prefer_client="hermes",
         )
         self.pool.import_skill_dir(
-            make_skill(source_root, "second/conflict-two", "Conflict Skill", description="secondary variant"),
+            make_skill(
+                source_root,
+                "second/conflict-two",
+                "Conflict Skill",
+                description="secondary variant",
+            ),
             source_type="github",
             source_locator="repo#second",
             source_version="main",
@@ -1273,11 +1511,15 @@ class SkillPoolTests(unittest.TestCase):
         self.assertEqual(mcp_detail["data"]["source_status"], "ok")
         self.assertEqual(len(mcp_detail["data"]["duplicate_groups"]), 1)
 
-        dedupe = self.request_json(base_url, "/api/mcp/clients/codex/dedupe", method="POST", body={})
+        dedupe = self.request_json(
+            base_url, "/api/mcp/clients/codex/dedupe", method="POST", body={}
+        )
         self.assertTrue(dedupe["ok"])
         self.assertTrue(dedupe["data"]["changed"])
 
-        cleanup_scan = self.request_json(base_url, "/api/cleanup/scan", method="POST", body={})
+        cleanup_scan = self.request_json(
+            base_url, "/api/cleanup/scan", method="POST", body={}
+        )
         self.assertTrue(cleanup_scan["ok"])
         cleanup_list = self.request_json(base_url, "/api/cleanup")
         self.assertTrue(cleanup_list["ok"])
@@ -1285,13 +1527,17 @@ class SkillPoolTests(unittest.TestCase):
     def test_web_scan_sources_matrix_and_discovery_endpoints(self):
         source_root = self.temp_dir / "scan-web"
         make_skill(source_root, "alpha", "Web Matrix Alpha")
-        self.pool.scan_source_add(str(source_root), role="global_source", path_kind="workspace")
+        self.pool.scan_source_add(
+            str(source_root), role="global_source", path_kind="workspace"
+        )
         self.pool.scan_sources_scan()
 
         base_url = self.start_web_server()
         matrix = self.request_json(base_url, "/api/skills/matrix")
         self.assertTrue(matrix["ok"])
-        self.assertTrue(any(row["name"] == "Web Matrix Alpha" for row in matrix["data"]["rows"]))
+        self.assertTrue(
+            any(row["name"] == "Web Matrix Alpha" for row in matrix["data"]["rows"])
+        )
 
         instances = self.request_json(base_url, "/api/skills/instances")
         self.assertTrue(instances["ok"])
@@ -1299,7 +1545,9 @@ class SkillPoolTests(unittest.TestCase):
 
         sources = self.request_json(base_url, "/api/scan-sources")
         self.assertTrue(sources["ok"])
-        self.assertTrue(any(item["path"] == str(source_root) for item in sources["data"]["sources"]))
+        self.assertTrue(
+            any(item["path"] == str(source_root) for item in sources["data"]["sources"])
+        )
 
         discovery = self.request_json(base_url, "/api/discovery")
         self.assertTrue(discovery["ok"])
@@ -1315,13 +1563,25 @@ class SkillPoolTests(unittest.TestCase):
 
             actions = self.request_json(base_url, "/api/tools/actions")
             self.assertTrue(actions["ok"])
-            self.assertTrue(any(item["id"] == "preview_all" for item in actions["data"]["actions"]))
+            self.assertTrue(
+                any(item["id"] == "preview_all" for item in actions["data"]["actions"])
+            )
 
-            recreate = self.request_json(base_url, "/api/tools/run", method="POST", body={"action_id": "recreate_shortcut"})
+            recreate = self.request_json(
+                base_url,
+                "/api/tools/run",
+                method="POST",
+                body={"action_id": "recreate_shortcut"},
+            )
             self.assertTrue(recreate["ok"])
             self.assertEqual(recreate["data"]["result"]["status"], "ready")
 
-            cleanup = self.request_json(base_url, "/api/tools/run", method="POST", body={"action_id": "cleanup_scan"})
+            cleanup = self.request_json(
+                base_url,
+                "/api/tools/run",
+                method="POST",
+                body={"action_id": "cleanup_scan"},
+            )
             self.assertTrue(cleanup["ok"])
             self.assertIn("result", cleanup["data"])
         finally:
@@ -1330,7 +1590,9 @@ class SkillPoolTests(unittest.TestCase):
 
     def test_web_inventory_export_endpoint(self):
         base_url = self.start_web_server()
-        exported = self.request_json(base_url, "/api/inventory/export?client=codex&format=json")
+        exported = self.request_json(
+            base_url, "/api/inventory/export?client=codex&format=json"
+        )
         self.assertTrue(exported["ok"])
         self.assertEqual(exported["data"]["format"], "json")
         self.assertIn('"client": "codex"', exported["data"]["content"])
@@ -1359,7 +1621,13 @@ class SkillPoolTests(unittest.TestCase):
         )
         transient_dir = self.temp_dir / "web-discovery"
         make_skill(transient_dir, "temp-only", "Temp Only")
-        self.pool.scan_source_add(str(transient_dir), role="global_source", path_kind="transient", enabled=False, suggested=True)
+        self.pool.scan_source_add(
+            str(transient_dir),
+            role="global_source",
+            path_kind="transient",
+            enabled=False,
+            suggested=True,
+        )
         self.pool.scan_sources_scan()
 
         base_url = self.start_web_server()
@@ -1372,7 +1640,12 @@ class SkillPoolTests(unittest.TestCase):
             base_url,
             "/api/sync/preview",
             method="POST",
-            body={"source_client": "codex", "target_clients": ["hermes"], "include_skills": True, "include_mcp": True},
+            body={
+                "source_client": "codex",
+                "target_clients": ["hermes"],
+                "include_skills": True,
+                "include_mcp": True,
+            },
         )
         self.assertTrue(preview["ok"])
         self.assertEqual(preview["data"]["targets"][0]["client"], "hermes")
@@ -1381,10 +1654,19 @@ class SkillPoolTests(unittest.TestCase):
             base_url,
             "/api/sync/apply",
             method="POST",
-            body={"source_client": "codex", "target_clients": ["hermes"], "include_skills": True, "include_mcp": True},
+            body={
+                "source_client": "codex",
+                "target_clients": ["hermes"],
+                "include_skills": True,
+                "include_mcp": True,
+            },
         )
         self.assertTrue(apply_result["ok"])
-        self.assertTrue((Path(self.clients["hermes"]["target_dir"]) / "web-sync" / "SKILL.md").exists())
+        self.assertTrue(
+            (
+                Path(self.clients["hermes"]["target_dir"]) / "web-sync" / "SKILL.md"
+            ).exists()
+        )
         self.assertEqual(self.pool.mcp_list("hermes")["server_count"], 1)
 
         disabled = self.request_json(
@@ -1405,7 +1687,9 @@ class SkillPoolTests(unittest.TestCase):
         summary = self.request_json(base_url, "/api/discovery/summary")
         self.assertTrue(summary["ok"])
         self.assertEqual(summary["data"]["counts"]["transient_only"], 1)
-        details = self.request_json(base_url, "/api/discovery/details?group=transient_only&limit=1")
+        details = self.request_json(
+            base_url, "/api/discovery/details?group=transient_only&limit=1"
+        )
         self.assertTrue(details["ok"])
         self.assertEqual(details["data"]["total"], 1)
         self.assertEqual(len(details["data"]["items"]), 1)
@@ -1413,7 +1697,9 @@ class SkillPoolTests(unittest.TestCase):
         shutil.rmtree(str(transient_dir))
         cached_summary = self.request_json(base_url, "/api/discovery/summary")
         self.assertEqual(cached_summary["data"]["counts"]["transient_only"], 1)
-        refreshed = self.request_json(base_url, "/api/discovery/refresh", method="POST", body={"summary": True})
+        refreshed = self.request_json(
+            base_url, "/api/discovery/refresh", method="POST", body={"summary": True}
+        )
         self.assertTrue(refreshed["ok"])
         self.assertEqual(refreshed["data"]["counts"]["transient_only"], 0)
 
@@ -1422,10 +1708,13 @@ class SkillPoolTests(unittest.TestCase):
     def test_cleanup_old_backups_removes_stale(self):
         """cleanup_old_backups() removes backups older than max_age_days."""
         from skillpool_app.core import write_json, datetime, timezone
+
         backups_dir = self.pool.backups_dir
         backups_dir.mkdir(parents=True, exist_ok=True)
         # Create an old backup (timestamp prefix from 60 days ago)
-        old_ts = (datetime.now(timezone.utc) - __import__("datetime").timedelta(days=60)).strftime("%Y%m%d%H%M%S")
+        old_ts = (
+            datetime.now(timezone.utc) - __import__("datetime").timedelta(days=60)
+        ).strftime("%Y%m%d%H%M%S")
         old_id = old_ts + "-deadbeef"
         old_dir = backups_dir / old_id / "hermes"
         old_dir.mkdir(parents=True)
@@ -1443,6 +1732,7 @@ class SkillPoolTests(unittest.TestCase):
     def test_cleanup_old_backups_respects_max_count(self):
         """cleanup_old_backups() keeps at most max_count backups."""
         from skillpool_app.core import write_json
+
         backups_dir = self.pool.backups_dir
         backups_dir.mkdir(parents=True, exist_ok=True)
         for i in range(5):
@@ -1455,6 +1745,7 @@ class SkillPoolTests(unittest.TestCase):
     def test_load_json_corrupted_returns_default(self):
         """load_json() returns default on corrupted JSON."""
         from skillpool_app.core import load_json
+
         bad = self.temp_dir / "corrupted.json"
         bad.write_text("{invalid json!!!", encoding="utf-8")
         result = load_json(bad, {"fallback": True})
@@ -1463,6 +1754,7 @@ class SkillPoolTests(unittest.TestCase):
     def test_parse_frontmatter_nested_yaml(self):
         """parse_frontmatter() handles multi-line dash lists."""
         from skillpool_app.core import parse_frontmatter
+
         md = "---\ntitle: Test\n\ntags:\n- python\n- go\n- rust\n---\n\nBody text"
         fm, body = parse_frontmatter(md)
         self.assertEqual(fm["title"], "Test")
@@ -1471,6 +1763,7 @@ class SkillPoolTests(unittest.TestCase):
 
     def test_parse_frontmatter_inline_json_list(self):
         from skillpool_app.core import parse_frontmatter
+
         md = '---\nitems: ["a", "b", "c"]\n---\ncontent'
         fm, body = parse_frontmatter(md)
         self.assertEqual(fm["items"], ["a", "b", "c"])
@@ -1488,6 +1781,7 @@ class SkillPoolTests(unittest.TestCase):
     def test_hash_directory_streams_large_file(self):
         """hash_directory() handles files without loading entire content into memory."""
         from skillpool_app.core import hash_directory
+
         test_dir = self.temp_dir / "hash_test"
         test_dir.mkdir()
         # Write a 2MB file

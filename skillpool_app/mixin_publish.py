@@ -21,10 +21,13 @@ from skillpool_app.core import (
     write_json,
 )
 
+
 class MixinPublish:
     """Mixin: preview, preview_all, diff, publish, publish_all..."""
 
-    def preview(self, client: str, *, detailed: bool = False, persist: bool = True) -> Dict[str, object]:
+    def preview(
+        self, client: str, *, detailed: bool = False, persist: bool = True
+    ) -> Dict[str, object]:
         clients = self.load_clients()
         registry = self.load_registry()
         client_config = self._require_client(client, clients)
@@ -50,25 +53,36 @@ class MixinPublish:
         extra_dir_status = self._extra_dir_status(client, client_config, registry)
         broken_paths = self._broken_direct_children(target_dir)
         config_extra_dirs = self._read_openclaw_extra_dirs(client_config)
-        will_rewrite_config = (
-            client_config.get("config_mode") == "openclaw-extra-dirs"
-            and config_extra_dirs != [str(target_dir)]
-        )
+        will_rewrite_config = client_config.get(
+            "config_mode"
+        ) == "openclaw-extra-dirs" and config_extra_dirs != [str(target_dir)]
         issues = []
         risk = "safe"
         unmanaged = [
-            item for item in extra_dir_status
-            if item["scope"] == "extra_dir" and item["exists"] and item["skill_count"] > 0 and not item["managed"]
+            item
+            for item in extra_dir_status
+            if item["scope"] == "extra_dir"
+            and item["exists"]
+            and item["skill_count"] > 0
+            and not item["managed"]
         ]
         if unmanaged:
-            issues.append("configured extraDirs contain skills that are not yet managed")
+            issues.append(
+                "configured extraDirs contain skills that are not yet managed"
+            )
             risk = "blocked"
-        missing_extra = [item for item in extra_dir_status if item["scope"] == "extra_dir" and not item["exists"]]
+        missing_extra = [
+            item
+            for item in extra_dir_status
+            if item["scope"] == "extra_dir" and not item["exists"]
+        ]
         if missing_extra and risk != "blocked":
             issues.append("configured extraDirs are missing")
             risk = "warning"
         if broken_paths and risk == "safe":
-            issues.append("target directory contains broken links or inaccessible direct children")
+            issues.append(
+                "target directory contains broken links or inaccessible direct children"
+            )
             risk = "warning"
         if not manifest["published_skill_ids"]:
             issues.append("manifest would publish zero skills")
@@ -102,29 +116,49 @@ class MixinPublish:
             publish_root = self.publish_dir / client
             publish_root.mkdir(parents=True, exist_ok=True)
             write_json(publish_root / "preview.json", result)
-            write_json(publish_root / "diff.json", {"client": client, "generated_at": result["generated_at"], "diff": diff})
-            self._record_preview_metadata(clients, client, result["generated_at"], result["status"])
+            write_json(
+                publish_root / "diff.json",
+                {
+                    "client": client,
+                    "generated_at": result["generated_at"],
+                    "diff": diff,
+                },
+            )
+            self._record_preview_metadata(
+                clients, client, result["generated_at"], result["status"]
+            )
             self.save_clients(clients)
         return result
 
     def preview_all(self) -> Dict[str, object]:
         return {
-            client: self.preview(client)
-            for client in self.load_clients()["clients"]
+            client: self.preview(client) for client in self.load_clients()["clients"]
         }
 
     def diff(self, client: str) -> Dict[str, object]:
         return self.preview(client, detailed=True)
 
-    def publish(self, client: str, *, force: bool = False, use_lock: bool = True) -> Dict[str, object]:
+    def publish(
+        self, client: str, *, force: bool = False, use_lock: bool = True
+    ) -> Dict[str, object]:
         if use_lock:
             self._acquire_lock("publish:{}".format(client))
         try:
             preview = self.preview(client, detailed=True)
             if preview["status"] == "blocked":
-                raise RuntimeError("Preview is blocked for '{}': {}".format(client, "; ".join(preview["issues"])))
-            if client in ("openclaw", "qclaw") and preview["status"] != "safe" and not force:
-                raise RuntimeError("Refusing to publish '{}' until preview is safe".format(client))
+                raise RuntimeError(
+                    "Preview is blocked for '{}': {}".format(
+                        client, "; ".join(preview["issues"])
+                    )
+                )
+            if (
+                client in ("openclaw", "qclaw")
+                and preview["status"] != "safe"
+                and not force
+            ):
+                raise RuntimeError(
+                    "Refusing to publish '{}' until preview is safe".format(client)
+                )
             clients = self.load_clients()
             registry = self.load_registry()
             client_config = self._require_client(client, clients)
@@ -142,13 +176,19 @@ class MixinPublish:
                     skill = registry["skills"][skill_id]
                     source_dir = Path(skill["files_path"])
                     published_name = skill["published_name"]
-                    shutil.copytree(str(source_dir), str(publish_skills_dir / published_name))
+                    shutil.copytree(
+                        str(source_dir), str(publish_skills_dir / published_name)
+                    )
                     target_skill_dir = target_dir / published_name
                     remove_path_lexists(target_skill_dir)
                     shutil.copytree(str(source_dir), str(target_skill_dir))
                 write_json(publish_root / "manifest.json", manifest)
-                if client_config["config_mode"] == "openclaw-extra-dirs" and client_config.get("config_path"):
-                    self._rewrite_openclaw_config(Path(client_config["config_path"]), target_dir)
+                if client_config[
+                    "config_mode"
+                ] == "openclaw-extra-dirs" and client_config.get("config_path"):
+                    self._rewrite_openclaw_config(
+                        Path(client_config["config_path"]), target_dir
+                    )
                 client_config["last_published_at"] = utc_now()
                 client_config["last_backup_id"] = backup_id
                 client_config["published_skill_ids"] = manifest["published_skill_ids"]
@@ -172,11 +212,21 @@ class MixinPublish:
 
     def publish_all(self, *, force: bool = False) -> Dict[str, Dict[str, object]]:
         if not force:
-            raise RuntimeError("publish --all requires --force; run preview --all first")
+            raise RuntimeError(
+                "publish --all requires --force; run preview --all first"
+            )
         previews = self.preview_all()
-        blocked = {client: data["issues"] for client, data in previews.items() if data["status"] == "blocked"}
+        blocked = {
+            client: data["issues"]
+            for client, data in previews.items()
+            if data["status"] == "blocked"
+        }
         if blocked:
-            raise RuntimeError("Refusing publish --all because previews are blocked: {}".format(blocked))
+            raise RuntimeError(
+                "Refusing publish --all because previews are blocked: {}".format(
+                    blocked
+                )
+            )
         results = {}
         for client in self.load_clients()["clients"]:
             results[client] = self.publish(client, force=True)
@@ -185,7 +235,9 @@ class MixinPublish:
     def rollback(self, client: str, backup_id: Optional[str] = None) -> Dict[str, str]:
         clients = self.load_clients()
         client_config = self._require_client(client, clients)
-        backup_dir = self._resolve_backup_dir(client, backup_id or client_config.get("last_backup_id"))
+        backup_dir = self._resolve_backup_dir(
+            client, backup_id or client_config.get("last_backup_id")
+        )
         if backup_dir is None:
             raise ValueError("No backup available for '{}'".format(client))
         self._restore_backup_dir(client, client_config, backup_dir)
@@ -196,9 +248,15 @@ class MixinPublish:
             self.save_clients(clients)
         self.generate_reports()
         doctor = self.doctor(deep=True, client=client)
-        return {"client": client, "restored_from": backup_dir.parent.name, "doctor_status": doctor["checks"][0]["status"]}
+        return {
+            "client": client,
+            "restored_from": backup_dir.parent.name,
+            "doctor_status": doctor["checks"][0]["status"],
+        }
 
-    def _restore_backup_dir(self, client: str, client_config: Dict[str, object], backup_dir: Path) -> None:
+    def _restore_backup_dir(
+        self, client: str, client_config: Dict[str, object], backup_dir: Path
+    ) -> None:
         target_snapshot = backup_dir / "target"
         target_dir = Path(client_config["target_dir"])
         safe_rmtree(target_dir)
@@ -211,7 +269,9 @@ class MixinPublish:
     def rollback_list(self, client: str) -> Dict[str, object]:
         self._require_client(client)
         backups = []
-        for backup_id_dir in sorted((p for p in self.backups_dir.iterdir() if p.is_dir()), reverse=True):
+        for backup_id_dir in sorted(
+            (p for p in self.backups_dir.iterdir() if p.is_dir()), reverse=True
+        ):
             backup_dir = backup_id_dir / client
             if not backup_dir.exists():
                 continue
@@ -237,7 +297,9 @@ class MixinPublish:
             "backup_id": backup_id,
             "path": str(backup_dir),
             "target_exists": target_dir.exists(),
-            "target_skill_count": len(self.discover_skills(target_dir)) if target_dir.exists() else 0,
+            "target_skill_count": len(self.discover_skills(target_dir))
+            if target_dir.exists()
+            else 0,
             "config_exists": (backup_dir / "config.json").exists(),
             "client_state": load_json(state_path, {}) if state_path.exists() else {},
         }
@@ -269,14 +331,17 @@ class MixinPublish:
             if not candidates:
                 continue
             scope_rank = {"target_dir": 0, "extra_dir": 1, "imported": 2}
-            chosen = preferred or sorted(
-                candidates,
-                key=lambda item: (
-                    scope_rank.get(item.get("source_scope", "imported"), 9),
-                    item["imported_at"],
-                    item["skill_id"],
-                ),
-            )[0]
+            chosen = (
+                preferred
+                or sorted(
+                    candidates,
+                    key=lambda item: (
+                        scope_rank.get(item.get("source_scope", "imported"), 9),
+                        item["imported_at"],
+                        item["skill_id"],
+                    ),
+                )[0]
+            )
             published.append(chosen["skill_id"])
         return {
             "client": client,
@@ -302,8 +367,14 @@ class MixinPublish:
                 except OSError:
                     continue
 
-    def _backup_client_state(self, client: str, client_config: Dict[str, object]) -> str:
-        backup_id = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "-" + secrets.token_hex(4)
+    def _backup_client_state(
+        self, client: str, client_config: Dict[str, object]
+    ) -> str:
+        backup_id = (
+            datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+            + "-"
+            + secrets.token_hex(4)
+        )
         backup_root = self.backups_dir / backup_id / client
         backup_root.mkdir(parents=True, exist_ok=True)
         target_dir = Path(client_config["target_dir"])
@@ -321,7 +392,9 @@ class MixinPublish:
         self.cleanup_old_backups()
         return backup_id
 
-    def cleanup_old_backups(self, max_age_days: int = 30, max_count: int = 50) -> Dict[str, object]:
+    def cleanup_old_backups(
+        self, max_age_days: int = 30, max_count: int = 50
+    ) -> Dict[str, object]:
         """Remove backups older than *max_age_days* and keep at most *max_count*."""
         if not self.backups_dir.exists():
             return {"removed": 0, "kept": 0}
@@ -339,7 +412,9 @@ class MixinPublish:
             # Parse timestamp prefix (first 14 chars: YYYYMMDDHHmmSS)
             ts_str = entry.name[:14]
             try:
-                ts = datetime.strptime(ts_str, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+                ts = datetime.strptime(ts_str, "%Y%m%d%H%M%S").replace(
+                    tzinfo=timezone.utc
+                )
                 age_days = (now - ts).days
                 if age_days > max_age_days:
                     delete = True
@@ -353,9 +428,15 @@ class MixinPublish:
                     removed.append(entry.name)
                 except OSError:
                     pass
-        return {"removed": len(removed), "kept": len(entries) - len(removed), "removed_ids": removed}
+        return {
+            "removed": len(removed),
+            "kept": len(entries) - len(removed),
+            "removed_ids": removed,
+        }
 
-    def _resolve_backup_dir(self, client: str, backup_id: Optional[str]) -> Optional[Path]:
+    def _resolve_backup_dir(
+        self, client: str, backup_id: Optional[str]
+    ) -> Optional[Path]:
         if not backup_id:
             return None
         path = self.backups_dir / backup_id / client
@@ -368,7 +449,9 @@ class MixinPublish:
         skills = data.setdefault("skills", {})
         load = skills.setdefault("load", {})
         load["extraDirs"] = [str(target_dir)]
-        config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        config_path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
 
     def _refresh_statuses(self, registry: Dict, clients: Dict) -> None:
         active_by_client = {}
@@ -379,7 +462,11 @@ class MixinPublish:
         for skill in registry["skills"].values():
             families.setdefault(skill["conflict_family"], []).append(skill)
         for family, members in families.items():
-            chosen_ids = {skill_id for skill_id in active_by_client if skill_id in {member["skill_id"] for member in members}}
+            chosen_ids = {
+                skill_id
+                for skill_id in active_by_client
+                if skill_id in {member["skill_id"] for member in members}
+            }
             for skill in members:
                 if skill["enabled_global"] == "disabled":
                     skill["status"] = "disabled"
@@ -403,5 +490,3 @@ class MixinPublish:
             return clients["clients"][client]
         except KeyError:
             raise ValueError("Unknown client '{}'".format(client))
-
-

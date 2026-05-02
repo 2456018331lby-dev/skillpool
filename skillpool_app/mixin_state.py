@@ -12,6 +12,7 @@ from skillpool_app.core import (
     write_json,
 )
 
+
 class MixinState:
     """Mixin: load_registry, save_registry, load_clients, save_clients, load_mcp_state..."""
 
@@ -36,7 +37,9 @@ class MixinState:
 
     def load_clients(self) -> Dict:
         self.init_state()
-        clients = load_json(self.clients_path, {"version": REGISTRY_VERSION, "clients": {}})
+        clients = load_json(
+            self.clients_path, {"version": REGISTRY_VERSION, "clients": {}}
+        )
         if self._migrate_clients(clients):
             self.save_clients(clients)
         return clients
@@ -47,7 +50,9 @@ class MixinState:
 
     def load_mcp_state(self) -> Dict:
         self.init_state()
-        return load_json(self.mcp_state_path, {"version": REGISTRY_VERSION, "clients": {}})
+        return load_json(
+            self.mcp_state_path, {"version": REGISTRY_VERSION, "clients": {}}
+        )
 
     def save_mcp_state(self, mcp_state: Dict) -> None:
         mcp_state["generated_at"] = utc_now()
@@ -57,7 +62,12 @@ class MixinState:
         self.init_state()
         return load_json(
             self.cleanup_candidates_path,
-            {"version": REGISTRY_VERSION, "generated_at": utc_now(), "candidates": {}, "order": []},
+            {
+                "version": REGISTRY_VERSION,
+                "generated_at": utc_now(),
+                "candidates": {},
+                "order": [],
+            },
         )
 
     def save_cleanup_candidates(self, cleanup_state: Dict) -> None:
@@ -66,8 +76,12 @@ class MixinState:
 
     def load_scan_sources(self) -> Dict:
         self.init_state()
-        scan_sources = load_json(self.scan_sources_path, {"version": REGISTRY_VERSION, "sources": {}})
-        clients = load_json(self.clients_path, {"version": REGISTRY_VERSION, "clients": {}})
+        scan_sources = load_json(
+            self.scan_sources_path, {"version": REGISTRY_VERSION, "sources": {}}
+        )
+        clients = load_json(
+            self.clients_path, {"version": REGISTRY_VERSION, "clients": {}}
+        )
         if self._migrate_scan_sources(scan_sources, clients):
             self.save_scan_sources(scan_sources)
         return scan_sources
@@ -102,13 +116,17 @@ class MixinState:
         cache["stale"] = True
         self.save_discovery_cache(cache)
 
-    def _record_preview_metadata(self, clients: Dict, client: str, generated_at: str, status: str) -> None:
+    def _record_preview_metadata(
+        self, clients: Dict, client: str, generated_at: str, status: str
+    ) -> None:
         client_state = self._require_client(client, clients)
         client_state["last_preview_at"] = generated_at
         client_state["last_preview_status"] = status
         clients["clients"][client] = client_state
 
-    def _record_deep_doctor_metadata(self, clients: Dict, client: str, generated_at: str, status: str) -> None:
+    def _record_deep_doctor_metadata(
+        self, clients: Dict, client: str, generated_at: str, status: str
+    ) -> None:
         client_state = self._require_client(client, clients)
         client_state["last_deep_doctor_at"] = generated_at
         client_state["last_deep_doctor_status"] = status
@@ -136,14 +154,18 @@ class MixinState:
                     changed = True
             for client, override in list(skill.get("client_overrides", {}).items()):
                 if override == "prefer":
-                    skill["client_overrides"][client] = "prefer:{}".format(skill["skill_id"])
+                    skill["client_overrides"][client] = "prefer:{}".format(
+                        skill["skill_id"]
+                    )
                     changed = True
         return changed
 
     def _migrate_clients(self, clients: Dict) -> bool:
         changed = False
         for client, config in clients.get("clients", {}).items():
-            defaults = self._client_state(client, self._default_clients.get(client, config))
+            defaults = self._client_state(
+                client, self._default_clients.get(client, config)
+            )
             for key, value in defaults.items():
                 if key not in config:
                     config[key] = value
@@ -189,13 +211,12 @@ class MixinState:
             if default_source.get("suggested") and current.get("suggested") is not True:
                 current["suggested"] = True
                 changed = True
-            if current.get("default_entry") and current.get("notes") != default_source.get("notes"):
+            if current.get("default_entry") and current.get(
+                "notes"
+            ) != default_source.get("notes"):
                 current["notes"] = default_source.get("notes")
                 changed = True
             elif not current.get("notes") and default_source.get("notes"):
                 current["notes"] = default_source["notes"]
                 changed = True
         return changed
-
-
-

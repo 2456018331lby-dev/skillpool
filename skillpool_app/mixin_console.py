@@ -15,6 +15,7 @@ from skillpool_app.core import (
     _powershell_command,
 )
 
+
 class MixinConsole:
     """Mixin: _console_pid_value, _query_process_command_line, _is_console_online, console_status, _read_shortcut_target..."""
 
@@ -22,7 +23,9 @@ class MixinConsole:
         self.init_state()
         if not self.console_pid_path.exists():
             return None, False, "pid file missing"
-        raw = self.console_pid_path.read_text(encoding="utf-8", errors="replace").strip()
+        raw = self.console_pid_path.read_text(
+            encoding="utf-8", errors="replace"
+        ).strip()
         if not raw:
             return None, True, "pid file empty"
         try:
@@ -36,7 +39,9 @@ class MixinConsole:
         try:
             result = subprocess.run(
                 _powershell_command(
-                    "$process = Get-CimInstance Win32_Process -Filter \"ProcessId = {}\"".format(pid),
+                    '$process = Get-CimInstance Win32_Process -Filter "ProcessId = {}"'.format(
+                        pid
+                    ),
                     "if ($null -eq $process) { exit 1 }",
                     "[string]$process.CommandLine",
                 ),
@@ -53,7 +58,9 @@ class MixinConsole:
 
     def _is_console_online(self) -> bool:
         try:
-            with socket.create_connection((self.console_host, self.console_port), timeout=0.6):
+            with socket.create_connection(
+                (self.console_host, self.console_port), timeout=0.6
+            ):
                 return True
         except OSError:
             return False
@@ -61,7 +68,11 @@ class MixinConsole:
     def console_status(self) -> Dict[str, object]:
         pid, has_pid_file, pid_error = self._console_pid_value()
         command_line = self._query_process_command_line(pid or 0) if pid else None
-        matches_skillpool = bool(command_line and "skillpool.py" in command_line and " serve" in " {} ".format(command_line))
+        matches_skillpool = bool(
+            command_line
+            and "skillpool.py" in command_line
+            and " serve" in " {} ".format(command_line)
+        )
         online = self._is_console_online()
 
         management = "stopped"
@@ -99,7 +110,9 @@ class MixinConsole:
             result = subprocess.run(
                 _powershell_command(
                     "$shell = New-Object -ComObject WScript.Shell",
-                    "$shortcut = $shell.CreateShortcut('{}')".format(str(shortcut_path).replace("'", "''")),
+                    "$shortcut = $shell.CreateShortcut('{}')".format(
+                        str(shortcut_path).replace("'", "''")
+                    ),
                     "[string]$shortcut.TargetPath",
                 ),
                 capture_output=True,
@@ -122,7 +135,9 @@ class MixinConsole:
         status = "missing"
         message = "桌面快捷方式不存在。"
         if exists and target_path:
-            status = "ready" if Path(target_path) == Path(expected_target) else "mismatch"
+            status = (
+                "ready" if Path(target_path) == Path(expected_target) else "mismatch"
+            )
             message = (
                 "桌面快捷方式已就绪。"
                 if status == "ready"
@@ -146,15 +161,25 @@ class MixinConsole:
         shortcut_path = self.desktop_shortcut_path
         shortcut_path.parent.mkdir(parents=True, exist_ok=True)
         target = self.root / "open-console.cmd"
-        icon_path = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "SHELL32.dll"
+        icon_path = (
+            Path(os.environ.get("SystemRoot", r"C:\Windows"))
+            / "System32"
+            / "SHELL32.dll"
+        )
         result = subprocess.run(
             _powershell_command(
                 "$shell = New-Object -ComObject WScript.Shell",
-                "$shortcut = $shell.CreateShortcut('{}')".format(str(shortcut_path).replace("'", "''")),
+                "$shortcut = $shell.CreateShortcut('{}')".format(
+                    str(shortcut_path).replace("'", "''")
+                ),
                 "$shortcut.TargetPath = '{}'".format(str(target).replace("'", "''")),
-                "$shortcut.WorkingDirectory = '{}'".format(str(self.root).replace("'", "''")),
+                "$shortcut.WorkingDirectory = '{}'".format(
+                    str(self.root).replace("'", "''")
+                ),
                 "$shortcut.Description = 'Open SkillPool local console'",
-                "$shortcut.IconLocation = '{},220'".format(str(icon_path).replace("'", "''")),
+                "$shortcut.IconLocation = '{},220'".format(
+                    str(icon_path).replace("'", "''")
+                ),
                 "$shortcut.Save()",
             ),
             capture_output=True,
@@ -162,7 +187,11 @@ class MixinConsole:
             check=False,
         )
         if result.returncode != 0:
-            raise RuntimeError("创建桌面快捷方式失败: {}".format((result.stderr or result.stdout or "").strip() or "unknown error"))
+            raise RuntimeError(
+                "创建桌面快捷方式失败: {}".format(
+                    (result.stderr or result.stdout or "").strip() or "unknown error"
+                )
+            )
         return self.desktop_shortcut_status()
 
     def manual_commands(self) -> List[Dict[str, object]]:
@@ -278,11 +307,19 @@ class MixinConsole:
             status = self.status()
             return {
                 "action_id": action_id,
-                "results": [self.preview(client, detailed=True) for client in sorted(status.get("clients", {}).keys())],
+                "results": [
+                    self.preview(client, detailed=True)
+                    for client in sorted(status.get("clients", {}).keys())
+                ],
             }
         if action_id == "doctor_all_deep":
             clients = sorted(self.load_clients().get("clients", {}).keys())
-            return {"action_id": action_id, "results": [self.doctor(deep=True, client=client) for client in clients]}
+            return {
+                "action_id": action_id,
+                "results": [
+                    self.doctor(deep=True, client=client) for client in clients
+                ],
+            }
         if action_id == "cleanup_scan":
             result = self.cleanup_scan()
             return {"action_id": action_id, "result": result}
@@ -305,6 +342,3 @@ class MixinConsole:
             "shortcut": self.desktop_shortcut_status(),
             "manual_commands": self.manual_commands(),
         }
-
-
-

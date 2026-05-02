@@ -20,16 +20,21 @@ from skillpool_app.core import (
     ensure_clean_directory,
 )
 
+
 class MixinImport:
     """Mixin: _github_request, _parse_github_locator, import_github, import_zip, import_detect_github..."""
 
     _GITHUB_TRANSIENT_CODES = {429, 500, 502, 503, 504}
 
     @staticmethod
-    def _github_request(url: str, dest: Path, timeout: int = 30, max_retries: int = 3) -> None:
+    def _github_request(
+        url: str, dest: Path, timeout: int = 30, max_retries: int = 3
+    ) -> None:
         """Download from a GitHub URL with auth token, timeout, and retry logic."""
         headers = {"User-Agent": "skillpool/0.1"}
-        token = os.environ.get("GITHUB_TOKEN") or os.environ.get("SKILLPOOL_GITHUB_TOKEN")
+        token = os.environ.get("GITHUB_TOKEN") or os.environ.get(
+            "SKILLPOOL_GITHUB_TOKEN"
+        )
         if token:
             headers["Authorization"] = "Bearer " + token
 
@@ -63,7 +68,9 @@ class MixinImport:
                 continue
         raise last_exc
 
-    def _parse_github_locator(self, locator: str, ref: Optional[str], subdir: Optional[str]) -> Tuple[str, str, Optional[str], str]:
+    def _parse_github_locator(
+        self, locator: str, ref: Optional[str], subdir: Optional[str]
+    ) -> Tuple[str, str, Optional[str], str]:
         locator = locator.strip()
         parsed = urllib.parse.urlparse(locator)
         if parsed.scheme and parsed.netloc:
@@ -86,20 +93,28 @@ class MixinImport:
             tree_subdir = subdir
         return owner, repo, tree_ref, tree_subdir or ""
 
-    def import_github(self, locator: str, ref: Optional[str] = None, subdir: Optional[str] = None) -> Dict[str, List[str]]:
-        owner, repo, resolved_ref, resolved_subdir = self._parse_github_locator(locator, ref, subdir)
+    def import_github(
+        self, locator: str, ref: Optional[str] = None, subdir: Optional[str] = None
+    ) -> Dict[str, List[str]]:
+        owner, repo, resolved_ref, resolved_subdir = self._parse_github_locator(
+            locator, ref, subdir
+        )
         archive_url = "https://api.github.com/repos/{}/{}/zipball".format(owner, repo)
         if resolved_ref:
             archive_url += "/{}".format(urllib.parse.quote(resolved_ref))
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-        cache_zip = self.cache_dir / "github-{}-{}-{}.zip".format(owner, repo, timestamp)
+        cache_zip = self.cache_dir / "github-{}-{}-{}.zip".format(
+            owner, repo, timestamp
+        )
         self._github_request(archive_url, cache_zip)
         extracted = self._extract_archive(cache_zip, "github-{}-{}".format(owner, repo))
         scan_root = extracted
         if resolved_subdir:
             scan_root = extracted / Path(resolved_subdir)
             if not scan_root.exists():
-                raise ValueError("Subdir '{}' was not found in archive".format(resolved_subdir))
+                raise ValueError(
+                    "Subdir '{}' was not found in archive".format(resolved_subdir)
+                )
         imported = self._import_from_directory(
             scan_root,
             source_type="github",
@@ -123,27 +138,47 @@ class MixinImport:
         self.generate_reports()
         return imported
 
-    def import_detect_github(self, locator: str, ref: Optional[str] = None, subdir: Optional[str] = None) -> Dict[str, object]:
-        owner, repo, resolved_ref, resolved_subdir = self._parse_github_locator(locator, ref, subdir)
+    def import_detect_github(
+        self, locator: str, ref: Optional[str] = None, subdir: Optional[str] = None
+    ) -> Dict[str, object]:
+        owner, repo, resolved_ref, resolved_subdir = self._parse_github_locator(
+            locator, ref, subdir
+        )
         archive_url = "https://api.github.com/repos/{}/{}/zipball".format(owner, repo)
         if resolved_ref:
             archive_url += "/{}".format(urllib.parse.quote(resolved_ref))
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-        cache_zip = self.cache_dir / "detect-{}-{}-{}.zip".format(owner, repo, timestamp)
+        cache_zip = self.cache_dir / "detect-{}-{}-{}.zip".format(
+            owner, repo, timestamp
+        )
         self._github_request(archive_url, cache_zip)
         extracted = self._extract_archive(cache_zip, "detect-{}-{}".format(owner, repo))
         scan_root = extracted
         if resolved_subdir:
             scan_root = extracted / Path(resolved_subdir)
             if not scan_root.exists():
-                raise ValueError("Subdir '{}' was not found in archive".format(resolved_subdir))
+                raise ValueError(
+                    "Subdir '{}' was not found in archive".format(resolved_subdir)
+                )
         skills = self.discover_skills(scan_root)
-        relative_paths = [str(path.relative_to(scan_root)).replace("\\", "/") for path in skills]
-        template_markers = {"template", "templates", "example", "examples", "sample", "samples"}
+        relative_paths = [
+            str(path.relative_to(scan_root)).replace("\\", "/") for path in skills
+        ]
+        template_markers = {
+            "template",
+            "templates",
+            "example",
+            "examples",
+            "sample",
+            "samples",
+        }
         if not skills:
             detected_type = "invalid"
             status = "invalid"
-        elif any(any(part.lower() in template_markers for part in Path(path).parts) for path in relative_paths):
+        elif any(
+            any(part.lower() in template_markers for part in Path(path).parts)
+            for path in relative_paths
+        ):
             detected_type = "template"
             status = "ok"
         elif len(skills) == 1:
@@ -176,7 +211,9 @@ class MixinImport:
         imported_skill_ids = []
         for index, item in enumerate(items):
             if not isinstance(item, dict):
-                raise ValueError("Batch manifest item {} must be an object".format(index))
+                raise ValueError(
+                    "Batch manifest item {} must be an object".format(index)
+                )
             source_type = item.get("type")
             if source_type == "github":
                 result = self.import_github(
@@ -187,13 +224,21 @@ class MixinImport:
             elif source_type == "zip":
                 result = self.import_zip(Path(str(item.get("zip_path", ""))))
             else:
-                raise ValueError("Unsupported batch import type: {}".format(source_type))
+                raise ValueError(
+                    "Unsupported batch import type: {}".format(source_type)
+                )
             results.append({"index": index, "type": source_type, "result": result})
             imported_skill_ids.extend(result.get("imported_skill_ids", []))
-        return {"manifest_path": str(manifest_path), "results": results, "imported_skill_ids": imported_skill_ids}
+        return {
+            "manifest_path": str(manifest_path),
+            "results": results,
+            "imported_skill_ids": imported_skill_ids,
+        }
 
     def _extract_archive(self, archive_path: Path, prefix: str) -> Path:
-        destination = self.cache_dir / "{}-{}".format(prefix, datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"))
+        destination = self.cache_dir / "{}-{}".format(
+            prefix, datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        )
         ensure_clean_directory(destination)
         with zipfile.ZipFile(str(archive_path), "r") as archive:
             archive.extractall(str(destination))
@@ -202,7 +247,14 @@ class MixinImport:
             return child_dirs[0]
         return destination
 
-    def _import_from_directory(self, directory: Path, *, source_type: str, source_locator: str, source_version: str) -> Dict[str, List[str]]:
+    def _import_from_directory(
+        self,
+        directory: Path,
+        *,
+        source_type: str,
+        source_locator: str,
+        source_version: str,
+    ) -> Dict[str, List[str]]:
         skills = self.discover_skills(directory)
         if not skills:
             raise ValueError("No SKILL.md files found under {}".format(directory))
@@ -212,11 +264,10 @@ class MixinImport:
                 self.import_skill_dir(
                     skill_dir,
                     source_type=source_type,
-                    source_locator="{}#{}".format(source_locator, skill_dir.relative_to(directory)),
+                    source_locator="{}#{}".format(
+                        source_locator, skill_dir.relative_to(directory)
+                    ),
                     source_version=source_version,
                 )["skill_id"]
             )
         return {"imported_skill_ids": imported}
-
-
-
