@@ -1061,7 +1061,7 @@ class SkillPoolTests(unittest.TestCase):
             def __exit__(self, exc_type, exc, tb):
                 self.close()
 
-        def _fake_urlopen(_request):
+        def _fake_urlopen(_request, **_kwargs):
             return _FakeResponse(archive.read_bytes())
 
         core_module.urllib.request.urlopen = _fake_urlopen

@@ -1,74 +1,103 @@
 # Contributing to SkillPool
 
-Thanks for contributing to SkillPool.
+Thanks for your interest in contributing! This guide covers everything you need to get started.
 
-## Scope
+## Development Setup
 
-SkillPool is a local-first Python tool for:
+```bash
+# Clone the repository
+git clone <your-repo-url> .skill-pool
+cd .skill-pool
 
-- importing and normalizing skills into a unified pool
-- previewing, publishing, rolling back, and auditing per-client skill sets
-- explaining live vs pool vs published state
-- auditing MCP configuration sources without becoming an MCP runtime manager
+# Install test dependencies
+pip install pytest
 
-## Development Principles
-
-- Keep the project dependency-free when possible.
-- Prefer Python standard library solutions.
-- Keep behavior reversible and auditable.
-- Do not add hidden background services.
-- Keep client-specific behavior explicit and explainable.
-
-## Local Setup
-
-```powershell
-cd %USERPROFILE%\.skill-pool
-python -m unittest discover -s tests -v
-python skillpool.py status
-python skillpool.py inventory
-python skillpool.py serve --host 127.0.0.1 --port 8765
+# Verify everything works
+python -m pytest tests/ -v
 ```
 
-## Before Opening a PR
+No external runtime dependencies — SkillPool uses only the Python standard library.
 
-- Run tests:
-  - `python -m unittest discover -s tests -v`
-- If UI files changed, run:
-  - `node --check skillpool_app/ui/app.js`
-- Update docs when CLI, API, UI, or workflow changes.
-- Keep Chinese user-facing copy consistent in the console UI.
+## Running Tests
 
-## Change Areas
+```bash
+# Full test suite
+python -m pytest tests/ -v
 
-### Core
+# Single test
+python -m pytest tests/test_skillpool.py::SkillPoolTests::test_publish_prefers_local_skill_and_rewrites_config -v
 
-- [`skillpool_app/core.py`](skillpool_app/core.py)
-- Keep registry, clients, publish, rollback, doctor, and inventory logic here.
+# Syntax check all modules
+python -c "import py_compile; import glob; [py_compile.compile(f, doraise=True) for f in glob.glob('skillpool_app/**/*.py', recursive=True)]"
+```
 
-### CLI
+## Code Style
 
-- [`skillpool_app/cli.py`](skillpool_app/cli.py)
+- **PEP 8** with 4-space indentation
+- **Type hints** on all public methods
+- **Docstrings** on non-trivial functions
+- Max line length: 120 characters
+- Use `pathlib.Path` for file operations, not `os.path`
+- Use `datetime.now(timezone.utc)`, never `datetime.utcnow()`
 
-### Web Console
+## Project Structure
 
-- [`skillpool_app/web.py`](skillpool_app/web.py)
-- [`skillpool_app/ui/index.html`](skillpool_app/ui/index.html)
-- [`skillpool_app/ui/app.js`](skillpool_app/ui/app.js)
-- [`skillpool_app/ui/styles.css`](skillpool_app/ui/styles.css)
+```
+skillpool_app/
+├── core.py              # SkillPool class (thin orchestrator)
+├── mixin_state.py       # State persistence (registry, clients, migrations)
+├── mixin_console.py     # Desktop console, shortcuts, tool actions
+├── mixin_import.py      # GitHub/ZIP/batch import logic
+├── mixin_scan.py        # Skill discovery and scan sources
+├── mixin_mcp.py         # MCP config management (Codex/Claude/Hermes)
+├── mixin_sync.py        # Cross-client sync and conflict resolution
+├── mixin_publish.py     # Preview, publish, rollback lifecycle
+├── mixin_inventory.py   # Inventory, discovery, cleanup, reports
+├── web.py               # HTTP console server
+├── cli.py               # CLI argument parsing and dispatch
+├── importer_plugins.py  # Plugin system for import sources
+└── ui/                  # Web console frontend (HTML/JS/CSS)
+```
 
-### Tests
+## Adding a New Client
 
-- [`tests/test_skillpool.py`](tests/test_skillpool.py)
+1. Add entry to `DEFAULT_CLIENTS` in `core.py`
+2. Add scan source to `LOCAL_SCAN_SOURCES` if applicable
+3. Add MCP config parser if the client has MCP support
+4. Add tests covering preview, publish, and rollback
 
-## Pull Request Guidance
+## Adding an Import Plugin
 
-- Explain why the change is needed.
-- List the user-facing behavior change.
-- Mention risks and rollback implications.
-- Include validation evidence.
+Subclass `ImporterPlugin` in `importer_plugins.py`:
 
-## Non-goals
+```python
+class MyImporterPlugin(ImporterPlugin):
+    @property
+    def name(self) -> str:
+        return "my-source"
 
-- Do not turn SkillPool into a long-running MCP process manager.
-- Do not silently mutate unsupported client MCP configurations.
-- Do not make destructive cleanup decisions without an audit path.
+    def detect(self, source: str) -> bool:
+        return source.startswith("my-scheme://")
+
+    def import_from(self, source: str, **kwargs) -> dict:
+        # your import logic
+        return {"plugin": self.name, "source": source}
+```
+
+## Pull Request Process
+
+1. Fork and create a feature branch
+2. Write tests for new functionality
+3. Ensure all tests pass: `python -m pytest tests/ -v`
+4. Run syntax check (see above)
+5. Submit PR with a clear description of changes
+
+## Reporting Issues
+
+- Use GitHub Issues with the provided templates
+- Include: Python version, OS, steps to reproduce, expected vs actual behavior
+- For security issues, see SECURITY.md
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.

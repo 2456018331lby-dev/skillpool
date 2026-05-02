@@ -233,9 +233,25 @@ function updateOnlineDependentControls() {
   updatePublishButton();
 }
 
-async function api(path, options = {}) {
+let csrfToken = null;
+
+async function fetchCsrfToken() {
   try {
-    const response = await fetch(path, {
+    const resp = await fetch("/api/csrf-token", { cache: "no-store" });
+    const payload = await resp.json();
+    if (payload.ok && payload.data?.token) {
+      csrfToken = payload.data.token;
+    }
+  } catch (_e) {
+    // CSRF endpoint may not exist yet; degrade gracefully
+  }
+  return csrfToken;
+}
+
+async function api(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(path, {
       cache: "no-store",
       ...options,
       headers:
@@ -243,22 +259,33 @@ async function api(path, options = {}) {
           ? options.headers
           : { "Content-Type": "application/json", ...(options.headers || {}) },
     });
-    const payload = await response.json();
-    setServiceOnline(true);
-    if (!payload.ok) {
-      const error = new Error(payload.error?.message || `HTTP ${response.status}`);
-      error.code = payload.error?.code || "api_error";
-      throw error;
-    }
-    return payload.data;
   } catch (error) {
+    // Network error (fetch failed) — service is truly offline
     setServiceOnline(false);
     throw normalizeFetchError(error);
   }
+  // We got a response from the server, so it IS online
+  setServiceOnline(true);
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (_e) {
+    throw new Error(`无法解析服务器响应 (HTTP ${response.status})`);
+  }
+  if (!payload.ok) {
+    const error = new Error(payload.error?.message || `HTTP ${response.status}`);
+    error.code = payload.error?.code || "api_error";
+    throw error;
+  }
+  return payload.data;
 }
 
-function postJson(path, body = {}) {
-  return api(path, { method: "POST", body: JSON.stringify(body) });
+async function postJson(path, body = {}) {
+  if (!csrfToken) {
+    await fetchCsrfToken();
+  }
+  const headers = csrfToken ? { "X-CSRF-Token": csrfToken } : {};
+  return api(path, { method: "POST", body: JSON.stringify(body), headers });
 }
 
 function toast(message) {

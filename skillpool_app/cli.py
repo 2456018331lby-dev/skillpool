@@ -2,10 +2,80 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 from skillpool_app.core import SkillPool
+
+
+# ---------------------------------------------------------------------------
+# Input validation helpers
+# ---------------------------------------------------------------------------
+
+_IDENTIFIER_RE = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9._/\-]*$')
+_REPO_OR_URL_RE = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9._/\-:@~+%]*$')
+_PATH_FORBIDDEN = set(';|&$`()<>\'"\n\r*?!#[]~{}')
+
+
+def _validate_id(value: str | None, name: str = "identifier") -> str | None:
+    """Validate a user-provided identifier; reject shell metacharacters."""
+    if value is None:
+        return None
+    if not _IDENTIFIER_RE.match(value):
+        raise ValueError(
+            f"Invalid {name}: {value!r} (must start with alphanumeric, "
+            f"then alphanumeric/dot/dash/underscore/slash only)"
+        )
+    return value
+
+
+def _validate_repo_or_url(value: str) -> str:
+    """Validate a repo identifier or URL."""
+    if not _REPO_OR_URL_RE.match(value):
+        raise ValueError(
+            f"Invalid repo/URL: {value!r} (contains disallowed characters)"
+        )
+    return value
+
+
+def _validate_path(value: str | None, name: str = "path") -> str | None:
+    """Validate a user-provided path; reject metacharacters and '..' traversal."""
+    if value is None:
+        return None
+    normalized = value.replace('\\', '/')
+    if any(part == '..' for part in normalized.split('/')):
+        raise ValueError(f"Invalid {name}: path traversal (..) not allowed")
+    bad = _PATH_FORBIDDEN & set(value)
+    if bad:
+        raise ValueError(
+            f"Invalid {name}: contains forbidden characters: {''.join(sorted(bad))}"
+        )
+    return value
+
+
+def _validate_string(value: str | None, name: str = "string") -> str | None:
+    """Validate a user-provided string against shell metacharacters."""
+    if value is None:
+        return None
+    bad = _PATH_FORBIDDEN & set(value)
+    if bad:
+        raise ValueError(
+            f"Invalid {name}: contains forbidden characters: {''.join(sorted(bad))}"
+        )
+    return value
+
+
+def _validate_ids(values: list[str] | None, name: str = "identifiers") -> list[str] | None:
+    """Validate each element in a list of identifiers."""
+    if values is None:
+        return None
+    return [_validate_id(v, name) for v in values]
+
+
+# ---------------------------------------------------------------------------
+# Display helper
+# ---------------------------------------------------------------------------
 
 
 def _print(result: Any) -> None:
@@ -13,6 +83,11 @@ def _print(result: Any) -> None:
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:
         print(result)
+
+
+# ---------------------------------------------------------------------------
+# Argument parser
+# ---------------------------------------------------------------------------
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -191,6 +266,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# ---------------------------------------------------------------------------
+# main() -- dict-dispatch with per-command handler functions
+# ---------------------------------------------------------------------------
+
+
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -203,85 +283,110 @@ def main(argv=None) -> int:
             return True, True
         return include_skills, include_mcp
 
-    if args.command == "init":
+    # -- individual command handlers ----------------------------------------
+
+    def _cmd_init() -> int:
         result = pool.init_state()
         result.update(pool.generate_reports())
         _print(result)
         return 0
-    if args.command == "scan-local":
+
+    def _cmd_scan_local() -> int:
         _print(pool.scan_local())
         return 0
-    if args.command == "import":
-        if args.import_command == "github":
-            _print(pool.import_github(args.repo_or_url, ref=args.ref, subdir=args.subdir))
-            return 0
-        if args.import_command == "zip":
-            _print(pool.import_zip(Path(args.zip_path)))
-            return 0
-        if args.import_command == "batch":
-            _print(pool.import_batch(Path(args.manifest_path)))
-            return 0
-        if args.import_command == "detect":
-            if args.source_type == "github":
-                _print(pool.import_detect_github(args.repo_or_url, ref=args.ref, subdir=args.subdir))
-                return 0
-    if args.command == "enable":
-        _print(pool.set_enabled_global(args.skill_id, True))
+
+    def _cmd_import() -> int:
+        sub = {
+            "github": lambda: _print(pool.import_github(
+                _validate_repo_or_url(args.repo_or_url),
+                ref=args.ref, subdir=args.subdir)),
+            "zip": lambda: _print(pool.import_zip(
+                Path(_validate_path(args.zip_path, "zip_path")))),
+            "batch": lambda: _print(pool.import_batch(
+                Path(_validate_path(args.manifest_path, "manifest_path")))),
+            "detect": _cmd_import_detect,
+        }
+        return sub[args.import_command]()
+
+    def _cmd_import_detect() -> int:
+        if args.source_type == "github":
+            _print(pool.import_detect_github(
+                _validate_repo_or_url(args.repo_or_url),
+                ref=args.ref, subdir=args.subdir))
         return 0
-    if args.command == "disable":
-        _print(pool.set_enabled_global(args.skill_id, False))
+
+    def _cmd_enable() -> int:
+        _print(pool.set_enabled_global(_validate_id(args.skill_id, "skill_id"), True))
         return 0
-    if args.command == "override":
+
+    def _cmd_disable() -> int:
+        _print(pool.set_enabled_global(_validate_id(args.skill_id, "skill_id"), False))
+        return 0
+
+    def _cmd_override() -> int:
+        client = _validate_id(args.client, "client")
         if args.override_command == "set":
-            _print(pool.override_set(args.client, args.conflict_family, args.skill_id))
-            return 0
-        if args.override_command == "list":
-            _print(pool.override_list(args.client))
-            return 0
-        if args.override_command == "inherit":
-            _print(pool.override_inherit(args.client, args.conflict_family))
-            return 0
-        if args.override_command == "disable":
-            _print(pool.override_disable(args.client, args.conflict_family))
-            return 0
+            _print(pool.override_set(
+                client,
+                _validate_id(args.conflict_family, "conflict_family"),
+                _validate_id(args.skill_id, "skill_id")))
+        elif args.override_command == "list":
+            _print(pool.override_list(client))
+        elif args.override_command == "inherit":
+            _print(pool.override_inherit(
+                client,
+                _validate_id(args.conflict_family, "conflict_family")))
+        elif args.override_command == "disable":
+            _print(pool.override_disable(
+                client,
+                _validate_id(args.conflict_family, "conflict_family")))
         return 0
-    if args.command == "publish":
+
+    def _cmd_publish() -> int:
         if args.publish_all:
             _print(pool.publish_all(force=args.force))
             return 0
         if not args.client:
             parser.error("publish requires a client or --all")
-        _print(pool.publish(args.client, force=args.force))
+        _print(pool.publish(_validate_id(args.client, "client"), force=args.force))
         return 0
-    if args.command == "rollback":
-        if args.rollback_args[0] == "list":
+
+    def _cmd_rollback() -> int:
+        subcmd = args.rollback_args[0]
+        if subcmd == "list":
             if len(args.rollback_args) != 2:
                 parser.error("rollback list requires a client")
-            _print(pool.rollback_list(args.rollback_args[1]))
+            _print(pool.rollback_list(
+                _validate_id(args.rollback_args[1], "client")))
             return 0
-        if args.rollback_args[0] == "inspect":
+        if subcmd == "inspect":
             if len(args.rollback_args) != 3:
                 parser.error("rollback inspect requires a client and backup_id")
-            _print(pool.rollback_inspect(args.rollback_args[1], args.rollback_args[2]))
+            _print(pool.rollback_inspect(
+                _validate_id(args.rollback_args[1], "client"),
+                _validate_id(args.rollback_args[2], "backup_id")))
             return 0
-        client = args.rollback_args[0]
-        backup_id = args.backup_id
+        client = _validate_id(subcmd, "client")
+        backup_id = _validate_id(args.backup_id, "backup_id") if args.backup_id else None
         if args.latest:
             backup_id = pool.latest_backup_id(client)
         _print(pool.rollback(client, backup_id=backup_id))
         return 0
-    if args.command == "preview":
+
+    def _cmd_preview() -> int:
         if args.preview_all:
             _print(pool.preview_all())
             return 0
         if not args.client:
             parser.error("preview requires a client or --all")
-        _print(pool.preview(args.client))
+        _print(pool.preview(_validate_id(args.client, "client")))
         return 0
-    if args.command == "diff":
-        _print(pool.diff(args.client))
+
+    def _cmd_diff() -> int:
+        _print(pool.diff(_validate_id(args.client, "client")))
         return 0
-    if args.command == "inventory":
+
+    def _cmd_inventory() -> int:
         include_skills = True
         include_mcp = True
         if args.inventory_skills and not args.inventory_mcp:
@@ -290,149 +395,184 @@ def main(argv=None) -> int:
             include_skills = False
         _print(
             pool.inventory(
-                client=args.client,
+                client=_validate_id(args.client, "client") if args.client else None,
                 include_skills=include_skills,
                 include_mcp=include_mcp,
                 summary_only=(args.client is None and not args.inventory_all),
             )
         )
         return 0
-    if args.command == "scan-sources":
-        if args.scan_sources_command == "list":
-            _print(pool.scan_sources_list())
-            return 0
-        if args.scan_sources_command == "add":
-            _print(
-                pool.scan_source_add(
-                    args.path,
-                    role=args.role,
-                    client=args.client,
-                    path_kind=args.path_kind,
-                    enabled=not args.disabled,
-                )
-            )
-            return 0
-        if args.scan_sources_command == "enable":
-            _print(pool.scan_source_enable(args.id))
-            return 0
-        if args.scan_sources_command == "disable":
-            _print(pool.scan_source_disable(args.id))
-            return 0
-        if args.scan_sources_command == "scan":
-            _print(pool.scan_sources_scan(args.id))
-            return 0
-    if args.command == "discovery":
-        if args.discovery_command == "summary":
-            _print(pool.discovery_summary())
-            return 0
-        if args.discovery_command == "refresh":
-            if args.summary:
+
+    def _cmd_scan_sources() -> int:
+        sub = {
+            "list": lambda: _print(pool.scan_sources_list()),
+            "add": lambda: _print(pool.scan_source_add(
+                _validate_path(args.path, "path"),
+                role=args.role,
+                client=_validate_id(args.client, "client") if args.client else None,
+                path_kind=args.path_kind,
+                enabled=not args.disabled)),
+            "enable": lambda: _print(pool.scan_source_enable(
+                _validate_id(args.id, "id"))),
+            "disable": lambda: _print(pool.scan_source_disable(
+                _validate_id(args.id, "id"))),
+            "scan": lambda: _print(pool.scan_sources_scan(args.id)),
+        }
+        sub[args.scan_sources_command]()
+        return 0
+
+    def _cmd_discovery() -> int:
+        sub = {
+            "summary": lambda: _print(pool.discovery_summary()),
+            "refresh": lambda: (
                 _print(pool.discovery_summary(refresh=True))
-            else:
-                _print(pool.discovery(refresh=True))
-            return 0
-        if args.discovery_command == "details":
-            _print(pool.discovery_details(args.group, limit=args.limit))
-            return 0
-        _print(pool.discovery())
+                if args.summary
+                else _print(pool.discovery(refresh=True))
+            ),
+            "details": lambda: _print(pool.discovery_details(
+                _validate_id(args.group, "group"), limit=args.limit)),
+        }
+        if args.discovery_command in sub:
+            sub[args.discovery_command]()
+        else:
+            _print(pool.discovery())
         return 0
-    if args.command == "sync":
+
+    def _cmd_sync() -> int:
         include_skills, include_mcp = _sync_modes(args)
-        if args.sync_command == "inspect":
-            _print(pool.sync_inspect(args.source_client, families=args.families))
-            return 0
-        if args.sync_command == "preview":
-            _print(
-                pool.sync_preview(
-                    args.source_client,
-                    args.targets,
-                    include_skills=include_skills,
-                    include_mcp=include_mcp,
-                    families=args.families,
-                )
-            )
-            return 0
-        if args.sync_command == "apply":
-            _print(
-                pool.sync_apply(
-                    args.source_client,
-                    args.targets,
-                    include_skills=include_skills,
-                    include_mcp=include_mcp,
-                    families=args.families,
-                )
-            )
-            return 0
-    if args.command == "batch":
-        if args.batch_command == "disable":
-            _print(pool.batch_disable(args.clients, args.families))
-            return 0
-        if args.batch_command == "inherit":
-            _print(pool.batch_inherit(args.clients, args.families))
-            return 0
+        source = _validate_id(args.source_client, "source_client")
+        targets = _validate_ids(args.targets, "target")
+        families = _validate_ids(args.families, "family")
+        sub = {
+            "inspect": lambda: _print(pool.sync_inspect(
+                source, families=families)),
+            "preview": lambda: _print(pool.sync_preview(
+                source, targets,
+                include_skills=include_skills,
+                include_mcp=include_mcp,
+                families=families)),
+            "apply": lambda: _print(pool.sync_apply(
+                source, targets,
+                include_skills=include_skills,
+                include_mcp=include_mcp,
+                families=families)),
+        }
+        sub[args.sync_command]()
         return 0
-    if args.command == "mcp":
-        if args.mcp_command == "list":
-            _print(pool.mcp_list(args.client))
-            return 0
-        if args.mcp_command == "diff":
-            _print(pool.mcp_diff(args.client))
-            return 0
-        if args.mcp_command == "enable":
-            _print(pool.mcp_enable(args.client, args.server_name))
-            return 0
-        if args.mcp_command == "disable":
-            _print(pool.mcp_disable(args.client, args.server_name))
-            return 0
-        if args.mcp_command == "add":
-            _print(pool.mcp_add(args.client, args.server_name, args.mcp_command_value, args=args.args or [], enabled=str(args.enabled).lower() == "true"))
-            return 0
-        if args.mcp_command == "update":
-            enabled = None if args.enabled is None else str(args.enabled).lower() == "true"
-            _print(
-                pool.mcp_update(
-                    args.client,
-                    args.server_name,
-                    new_name=args.new_name,
-                    command=args.mcp_command_value,
-                    args=args.args,
-                    enabled=enabled,
-                )
+
+    def _cmd_batch() -> int:
+        clients = _validate_ids(args.clients, "client")
+        families = _validate_ids(args.families, "family")
+        sub = {
+            "disable": lambda: _print(pool.batch_disable(clients, families)),
+            "inherit": lambda: _print(pool.batch_inherit(clients, families)),
+        }
+        sub[args.batch_command]()
+        return 0
+
+    def _cmd_mcp() -> int:
+        client = _validate_id(args.client, "client")
+        sub = {
+            "list": lambda: _print(pool.mcp_list(client)),
+            "diff": lambda: _print(pool.mcp_diff(client)),
+            "enable": lambda: _print(pool.mcp_enable(
+                client, _validate_id(args.server_name, "server_name"))),
+            "disable": lambda: _print(pool.mcp_disable(
+                client, _validate_id(args.server_name, "server_name"))),
+            "add": lambda: _print(pool.mcp_add(
+                client,
+                _validate_id(args.server_name, "server_name"),
+                _validate_string(args.mcp_command_value, "command"),
+                args=args.args or [],
+                enabled=str(args.enabled).lower() == "true")),
+            "update": _cmd_mcp_update,
+            "remove": lambda: _print(pool.mcp_remove(
+                client, _validate_id(args.server_name, "server_name"))),
+            "dedupe": _cmd_mcp_dedupe,
+        }
+        sub[args.mcp_command]()
+        return 0
+
+    def _cmd_mcp_update() -> int:
+        client = _validate_id(args.client, "client")
+        srv = _validate_id(args.server_name, "server_name")
+        enabled = None if args.enabled is None else str(args.enabled).lower() == "true"
+        _print(
+            pool.mcp_update(
+                client, srv,
+                new_name=_validate_id(args.new_name, "new_name") if args.new_name else None,
+                command=_validate_string(args.mcp_command_value, "command") if args.mcp_command_value else None,
+                args=args.args,
+                enabled=enabled,
             )
-            return 0
-        if args.mcp_command == "remove":
-            _print(pool.mcp_remove(args.client, args.server_name))
-            return 0
-        if args.mcp_command == "dedupe":
-            if args.client != "codex":
-                parser.error("mcp dedupe currently only supports codex")
-            _print(pool.mcp_dedupe_codex())
-            return 0
-    if args.command == "cleanup":
-        if args.cleanup_command == "scan":
-            _print(pool.cleanup_scan())
-            return 0
-        if args.cleanup_command == "list":
-            _print(pool.cleanup_list())
-            return 0
-        if args.cleanup_command == "mark":
-            _print(pool.cleanup_mark(args.skill_id, args.label))
-            return 0
-        if args.cleanup_command == "export":
-            _print(pool.cleanup_export())
-            return 0
-    if args.command == "status":
+        )
+        return 0
+
+    def _cmd_mcp_dedupe() -> int:
+        client = _validate_id(args.client, "client")
+        if client != "codex":
+            parser.error("mcp dedupe currently only supports codex")
+        _print(pool.mcp_dedupe_codex())
+        return 0
+
+    def _cmd_cleanup() -> int:
+        sub = {
+            "scan": lambda: _print(pool.cleanup_scan()),
+            "list": lambda: _print(pool.cleanup_list()),
+            "mark": lambda: _print(pool.cleanup_mark(
+                _validate_id(args.skill_id, "skill_id"),
+                _validate_string(args.label, "label"))),
+            "export": lambda: _print(pool.cleanup_export()),
+        }
+        sub[args.cleanup_command]()
+        return 0
+
+    def _cmd_status() -> int:
         _print(pool.status())
         return 0
-    if args.command == "doctor":
-        _print(pool.doctor(deep=args.deep, client=args.client))
+
+    def _cmd_doctor() -> int:
+        _print(pool.doctor(
+            deep=args.deep,
+            client=_validate_id(args.client, "client") if args.client else None))
         return 0
-    if args.command == "report":
+
+    def _cmd_report() -> int:
         _print(pool.generate_reports())
         return 0
-    if args.command == "serve":
-        from skillpool_app.web import serve
 
-        return serve(pool, host=args.host, port=args.port, open_browser=args.open_browser)
-    parser.error("Unknown command")
-    return 2
+    def _cmd_serve() -> int:
+        from skillpool_app.web import serve
+        return serve(pool, host=args.host, port=args.port,
+                     open_browser=args.open_browser)
+
+    # -- top-level dispatch dict --------------------------------------------
+    dispatch: dict[str, callable] = {
+        "init":         _cmd_init,
+        "scan-local":   _cmd_scan_local,
+        "import":       _cmd_import,
+        "enable":       _cmd_enable,
+        "disable":      _cmd_disable,
+        "override":     _cmd_override,
+        "publish":      _cmd_publish,
+        "rollback":     _cmd_rollback,
+        "preview":      _cmd_preview,
+        "diff":         _cmd_diff,
+        "inventory":    _cmd_inventory,
+        "scan-sources": _cmd_scan_sources,
+        "discovery":    _cmd_discovery,
+        "sync":         _cmd_sync,
+        "batch":        _cmd_batch,
+        "mcp":          _cmd_mcp,
+        "cleanup":      _cmd_cleanup,
+        "status":       _cmd_status,
+        "doctor":       _cmd_doctor,
+        "report":       _cmd_report,
+        "serve":        _cmd_serve,
+    }
+
+    handler = dispatch.get(args.command)
+    if handler is None:
+        parser.error(f"Unknown command: {args.command}")
+        return 2
+    return handler()

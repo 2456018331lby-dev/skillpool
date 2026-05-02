@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import cgi
 import json
 import mimetypes
+import re
+import secrets
 import tempfile
 import threading
 import time
@@ -44,6 +45,7 @@ class SkillPoolWebServer(ThreadingHTTPServer):
         super().__init__(address, SkillPoolRequestHandler)
         self.pool = pool
         self.ui_dir = UI_DIR
+        self.csrf_token = secrets.token_urlsafe(32)
 
 
 class SkillPoolRequestHandler(BaseHTTPRequestHandler):
@@ -55,6 +57,19 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
     @property
     def pool(self) -> SkillPool:
         return self.server.pool
+
+    @property
+    def csrf_token(self) -> str:
+        return self.server.csrf_token
+
+    @staticmethod
+    def _safe_path_param(value: str) -> str:
+        """Validate a URL path parameter to prevent path traversal."""
+        if not value:
+            raise ValueError("Empty path parameter")
+        if ".." in value or "/" in value or "\\" in value or "\0" in value:
+            raise ValueError("Invalid path parameter: {}".format(value))
+        return value
 
     def do_GET(self):
         self._handle(self._route_get)
@@ -71,6 +86,8 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             self._send_error("bad_request", str(exc), 400)
         except RuntimeError as exc:
             self._send_error("runtime_error", str(exc), 409)
+        except PermissionError as exc:
+            self._send_error("forbidden", str(exc), 403)
         except Exception as exc:
             self._send_error("internal_error", str(exc), 500)
 
@@ -92,6 +109,9 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/health":
             self._send_ok({"status": "ok", "service": "skillpool-console"})
+            return
+        if path == "/api/csrf-token":
+            self._send_ok({"csrf_token": self.csrf_token})
             return
         if path == "/api/system":
             self._send_ok(self.pool.system_status())
@@ -143,7 +163,7 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             )
             return
         if len(segments) == 3 and segments[:2] == ["api", "skills"]:
-            self._send_ok(self.pool.get_skill(segments[2]))
+            self._send_ok(self.pool.get_skill(self._safe_path_param(segments[2])))
             return
         if path == "/api/conflicts":
             self._send_ok(self.pool.list_conflicts(family=_first(query, "family")))
@@ -156,16 +176,16 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return
         if len(segments) == 4 and segments[:3] == ["api", "sync", "template"]:
             families = query.get("family") or None
-            self._send_ok(self.pool.sync_inspect(segments[3], families=families))
+            self._send_ok(self.pool.sync_inspect(self._safe_path_param(segments[3]), families=families))
             return
         if path == "/api/mcp/clients":
             self._send_ok(self.pool.mcp_clients())
             return
         if len(segments) == 4 and segments[:3] == ["api", "mcp", "clients"]:
-            self._send_ok(self.pool.mcp_list(segments[3]))
+            self._send_ok(self.pool.mcp_list(self._safe_path_param(segments[3])))
             return
         if len(segments) == 5 and segments[:3] == ["api", "mcp", "clients"] and segments[4] == "diff":
-            self._send_ok(self.pool.mcp_diff(segments[3]))
+            self._send_ok(self.pool.mcp_diff(self._safe_path_param(segments[3])))
             return
         if path == "/api/inventory":
             self._send_ok(self.pool.inventory(summary_only=True))
@@ -191,31 +211,31 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             )
             return
         if len(segments) == 3 and segments[:2] == ["api", "inventory"]:
-            self._send_ok(self.pool.inventory(client=segments[2]))
+            self._send_ok(self.pool.inventory(client=self._safe_path_param(segments[2])))
             return
         if len(segments) == 4 and segments[:2] == ["api", "inventory"] and segments[3] == "skills":
-            inventory = self.pool.inventory(client=segments[2], include_mcp=False)
+            inventory = self.pool.inventory(client=self._safe_path_param(segments[2]), include_mcp=False)
             self._send_ok({"client": inventory["client"], "generated_at": inventory["generated_at"], "skills": inventory["skills"]})
             return
         if len(segments) == 4 and segments[:2] == ["api", "inventory"] and segments[3] == "mcp":
-            inventory = self.pool.inventory(client=segments[2], include_skills=False)
+            inventory = self.pool.inventory(client=self._safe_path_param(segments[2]), include_skills=False)
             self._send_ok({"client": inventory["client"], "generated_at": inventory["generated_at"], "mcp": inventory["mcp"]})
             return
 
         if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "preview":
-            self._send_ok(self.pool.preview(segments[2], detailed=_truthy(_first(query, "detailed"))))
+            self._send_ok(self.pool.preview(self._safe_path_param(segments[2]), detailed=_truthy(_first(query, "detailed"))))
             return
         if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "diff":
-            self._send_ok(self.pool.diff(segments[2]))
+            self._send_ok(self.pool.diff(self._safe_path_param(segments[2])))
             return
         if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "doctor":
-            self._send_ok(self.pool.doctor(deep=_truthy(_first(query, "deep")), client=segments[2]))
+            self._send_ok(self.pool.doctor(deep=_truthy(_first(query, "deep")), client=self._safe_path_param(segments[2])))
             return
         if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "backups":
-            self._send_ok(self.pool.rollback_list(segments[2]))
+            self._send_ok(self.pool.rollback_list(self._safe_path_param(segments[2])))
             return
         if len(segments) == 5 and segments[:2] == ["api", "clients"] and segments[3] == "backups":
-            self._send_ok(self.pool.rollback_inspect(segments[2], segments[4]))
+            self._send_ok(self.pool.rollback_inspect(self._safe_path_param(segments[2]), self._safe_path_param(segments[4])))
             return
         if path == "/api/cleanup":
             self._send_ok(self.pool.cleanup_list())
@@ -243,6 +263,7 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
         raise FileNotFoundError(path)
 
     def _route_post(self):
+        self._validate_csrf()
         parsed = urlparse(self.path)
         path = parsed.path
         segments = [unquote(part) for part in path.split("/") if part]
@@ -402,14 +423,14 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return
 
         if len(segments) == 4 and segments[:2] == ["api", "skills"] and segments[3] == "enable":
-            self._send_ok(self.pool.set_enabled_global(segments[2], True))
+            self._send_ok(self.pool.set_enabled_global(self._safe_path_param(segments[2]), True))
             return
         if len(segments) == 4 and segments[:2] == ["api", "skills"] and segments[3] == "disable":
-            self._send_ok(self.pool.set_enabled_global(segments[2], False))
+            self._send_ok(self.pool.set_enabled_global(self._safe_path_param(segments[2]), False))
             return
         if len(segments) == 5 and segments[:3] == ["api", "mcp", "clients"]:
             payload = self._read_json_body()
-            client = segments[3]
+            client = self._safe_path_param(segments[3])
             action = segments[4]
             if action == "enable":
                 self._send_ok(self.pool.mcp_enable(client, str(payload.get("server_name", ""))))
@@ -449,14 +470,14 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return
         if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "publish":
             payload = self._read_json_body()
-            self._send_ok(self.pool.publish(segments[2], force=bool(payload.get("force", False))))
+            self._send_ok(self.pool.publish(self._safe_path_param(segments[2]), force=bool(payload.get("force", False))))
             return
         if len(segments) == 4 and segments[:2] == ["api", "clients"] and segments[3] == "rollback":
             payload = self._read_json_body()
             backup_id = payload.get("backup_id") or None
             if payload.get("latest"):
-                backup_id = self.pool.latest_backup_id(segments[2])
-            self._send_ok(self.pool.rollback(segments[2], backup_id=backup_id))
+                backup_id = self.pool.latest_backup_id(self._safe_path_param(segments[2]))
+            self._send_ok(self.pool.rollback(self._safe_path_param(segments[2]), backup_id=backup_id))
             return
 
         raise FileNotFoundError(path)
@@ -470,26 +491,67 @@ class SkillPoolRequestHandler(BaseHTTPRequestHandler):
             return {}
         return json.loads(raw)
 
+    def _validate_csrf(self) -> None:
+        """Validate CSRF token on POST requests from browser contexts."""
+        # Only enforce CSRF for browser requests (those with Origin or Cookie headers).
+        # API clients and tests typically don't send these, so they're exempt.
+        has_origin = self.headers.get("Origin") is not None
+        has_cookie = self.headers.get("Cookie") is not None
+        if not has_origin and not has_cookie:
+            return
+        token = self.headers.get("X-CSRF-Token", "")
+        if not token or not secrets.compare_digest(token, self.csrf_token):
+            raise PermissionError("Invalid or missing CSRF token")
+
+    def _parse_multipart(self, content_type: str) -> Dict[str, dict]:
+        """Manual multipart/form-data parser. Returns {name: {data, filename, content_type}}."""
+        match = re.search(r"boundary=([^;,\s]+)", content_type, re.IGNORECASE)
+        if not match:
+            raise ValueError("Missing boundary in multipart Content-Type")
+        boundary = match.group(1).encode("utf-8")
+        content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length <= 0 or content_length > 500 * 1024 * 1024:
+            raise ValueError("Invalid or excessive Content-Length for upload")
+        body = self.rfile.read(content_length)
+        parts: Dict[str, dict] = {}
+        delimiter = b"--" + boundary
+        segments = body.split(delimiter)
+        for segment in segments[1:]:
+            if segment.strip() == b"--" or segment.strip() == b"":
+                continue
+            header_end = segment.find(b"\r\n\r\n")
+            if header_end == -1:
+                continue
+            raw_headers = segment[:header_end].decode("utf-8", errors="replace")
+            part_body = segment[header_end + 4:]
+            if part_body.endswith(b"\r\n"):
+                part_body = part_body[:-2]
+            disp_match = re.search(
+                r'Content-Disposition:\s*form-data;[^"]*name="([^"]*)"', raw_headers, re.IGNORECASE
+            )
+            name = disp_match.group(1) if disp_match else ""
+            fname_match = re.search(
+                r'Content-Disposition:\s*form-data;[^"]*filename="([^"]*)"', raw_headers, re.IGNORECASE
+            )
+            filename = fname_match.group(1) if fname_match else ""
+            ct_match = re.search(r"Content-Type:\s*(\S+)", raw_headers, re.IGNORECASE)
+            part_ct = ct_match.group(1) if ct_match else ""
+            if name:
+                parts[name] = {"data": part_body, "filename": filename, "content_type": part_ct}
+        return parts
+
     def _import_uploaded_zip(self) -> Dict:
         content_type = self.headers.get("Content-Type", "")
         if "multipart/form-data" not in content_type:
             raise ValueError("ZIP import expects multipart/form-data")
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={
-                "REQUEST_METHOD": "POST",
-                "CONTENT_TYPE": content_type,
-                "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
-            },
-        )
-        field = form["zip"] if "zip" in form else (form["file"] if "file" in form else None)
-        if field is None or not getattr(field, "file", None):
+        parts = self._parse_multipart(content_type)
+        field = parts.get("zip") or parts.get("file")
+        if field is None or not field.get("data"):
             raise ValueError("ZIP upload field must be named 'zip' or 'file'")
-        suffix = Path(getattr(field, "filename", "") or "uploaded.zip").suffix or ".zip"
+        suffix = Path(field.get("filename", "") or "uploaded.zip").suffix or ".zip"
         with tempfile.NamedTemporaryFile(prefix="skillpool-upload-", suffix=suffix, delete=False) as handle:
             temp_path = Path(handle.name)
-            handle.write(field.file.read())
+            handle.write(field["data"])
         try:
             return self.pool.import_zip(temp_path)
         finally:
