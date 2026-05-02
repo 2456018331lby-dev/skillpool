@@ -17,7 +17,6 @@ import time
 import urllib.parse
 import urllib.request
 import zipfile  # noqa: F401  # re-exported for mixin_import
-import fcntl  # noqa: F401  # re-exported for mixin_state
 import secrets  # noqa: F401  # re-exported for mixin_publish
 from datetime import datetime, timezone
 from pathlib import Path

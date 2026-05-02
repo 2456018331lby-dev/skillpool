@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import re
 import secrets
 import tempfile
@@ -761,15 +762,38 @@ def create_server(
     return SkillPoolWebServer((host, port), pool)
 
 
+def _cleanup_stale_pid(pid_path: Path) -> None:
+    """Remove PID file if the recorded process is no longer running."""
+    if not pid_path.exists():
+        return
+    try:
+        raw = pid_path.read_text(encoding="utf-8", errors="replace").strip()
+        old_pid = int(raw)
+        os.kill(old_pid, 0)  # signal 0 = check if alive
+    except (ValueError, OSError, ProcessLookupError, PermissionError):
+        try:
+            pid_path.unlink()
+        except OSError:
+            pass
+
+
 def serve(
     pool: SkillPool,
     host: str = "127.0.0.1",
     port: int = 8765,
     open_browser: bool = False,
 ) -> int:
+    # Clean up stale PID file before binding
+    _cleanup_stale_pid(pool.console_pid_path)
     server = create_server(pool, host=host, port=port)
     actual_host, actual_port = server.server_address[:2]
     url = "http://{}:{}/".format(actual_host, actual_port)
+    # Write PID file
+    pool.state_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        pool.console_pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError:
+        pass
     print("SkillPool console listening at {}".format(url))
     if open_browser:
         webbrowser.open(url)
@@ -779,4 +803,8 @@ def serve(
         print("\nSkillPool console stopped")
     finally:
         server.server_close()
+        try:
+            pool.console_pid_path.unlink()
+        except OSError:
+            pass
     return 0
