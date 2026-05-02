@@ -320,7 +320,42 @@ class MixinPublish:
             "published_skill_ids": client_config.get("published_skill_ids", []),
         }
         write_json(backup_root / "client_state.json", state_snapshot)
+        self.cleanup_old_backups()
         return backup_id
+
+    def cleanup_old_backups(self, max_age_days: int = 30, max_count: int = 50) -> Dict[str, object]:
+        """Remove backups older than *max_age_days* and keep at most *max_count*."""
+        if not self.backups_dir.exists():
+            return {"removed": 0, "kept": 0}
+        now = datetime.now(timezone.utc)
+        entries = []
+        for entry in self.backups_dir.iterdir():
+            if not entry.is_dir():
+                continue
+            entries.append(entry)
+        # Sort by name (timestamp-hex sorts chronologically)
+        entries.sort(key=lambda e: e.name, reverse=True)
+        removed = []
+        for idx, entry in enumerate(entries):
+            delete = False
+            # Parse timestamp prefix (first 14 chars: YYYYMMDDHHmmSS)
+            ts_str = entry.name[:14]
+            try:
+                ts = datetime.strptime(ts_str, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+                age_days = (now - ts).days
+                if age_days > max_age_days:
+                    delete = True
+            except (ValueError, IndexError):
+                pass
+            if idx >= max_count:
+                delete = True
+            if delete:
+                try:
+                    shutil.rmtree(str(entry))
+                    removed.append(entry.name)
+                except OSError:
+                    pass
+        return {"removed": len(removed), "kept": len(entries) - len(removed), "removed_ids": removed}
 
     def _resolve_backup_dir(self, client: str, backup_id: Optional[str]) -> Optional[Path]:
         if not backup_id:

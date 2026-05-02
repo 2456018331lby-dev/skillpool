@@ -1417,6 +1417,87 @@ class SkillPoolTests(unittest.TestCase):
         self.assertTrue(refreshed["ok"])
         self.assertEqual(refreshed["data"]["counts"]["transient_only"], 0)
 
+    # -- New tests from audit fixes --------------------------------------------
+
+    def test_cleanup_old_backups_removes_stale(self):
+        """cleanup_old_backups() removes backups older than max_age_days."""
+        from skillpool_app.core import write_json, datetime, timezone
+        backups_dir = self.pool.backups_dir
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        # Create an old backup (timestamp prefix from 60 days ago)
+        old_ts = (datetime.now(timezone.utc) - __import__("datetime").timedelta(days=60)).strftime("%Y%m%d%H%M%S")
+        old_id = old_ts + "-deadbeef"
+        old_dir = backups_dir / old_id / "hermes"
+        old_dir.mkdir(parents=True)
+        write_json(old_dir / "state.json", {"test": True})
+        # Create a recent backup
+        recent_id = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "-aabbccdd"
+        recent_dir = backups_dir / recent_id / "hermes"
+        recent_dir.mkdir(parents=True)
+        write_json(recent_dir / "state.json", {"test": True})
+        result = self.pool.cleanup_old_backups(max_age_days=30)
+        self.assertEqual(result["removed"], 1)
+        self.assertFalse(old_dir.exists())
+        self.assertTrue(recent_dir.exists())
+
+    def test_cleanup_old_backups_respects_max_count(self):
+        """cleanup_old_backups() keeps at most max_count backups."""
+        from skillpool_app.core import write_json
+        backups_dir = self.pool.backups_dir
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        for i in range(5):
+            d = backups_dir / f"2026010100000{i:01d}-{'a' * 8}" / "hermes"
+            d.mkdir(parents=True)
+            write_json(d / "state.json", {"i": i})
+        result = self.pool.cleanup_old_backups(max_age_days=365, max_count=3)
+        self.assertEqual(result["removed"], 2)
+
+    def test_load_json_corrupted_returns_default(self):
+        """load_json() returns default on corrupted JSON."""
+        from skillpool_app.core import load_json
+        bad = self.temp_dir / "corrupted.json"
+        bad.write_text("{invalid json!!!", encoding="utf-8")
+        result = load_json(bad, {"fallback": True})
+        self.assertEqual(result, {"fallback": True})
+
+    def test_parse_frontmatter_nested_yaml(self):
+        """parse_frontmatter() handles multi-line dash lists."""
+        from skillpool_app.core import parse_frontmatter
+        md = "---\ntitle: Test\n\ntags:\n- python\n- go\n- rust\n---\n\nBody text"
+        fm, body = parse_frontmatter(md)
+        self.assertEqual(fm["title"], "Test")
+        self.assertEqual(fm["tags"], ["python", "go", "rust"])
+        self.assertIn("Body text", body)
+
+    def test_parse_frontmatter_inline_json_list(self):
+        from skillpool_app.core import parse_frontmatter
+        md = '---\nitems: ["a", "b", "c"]\n---\ncontent'
+        fm, body = parse_frontmatter(md)
+        self.assertEqual(fm["items"], ["a", "b", "c"])
+
+    def test_lock_contention_raises(self):
+        """Double _acquire_lock() raises RuntimeError."""
+        self.pool.init_state()
+        self.pool._acquire_lock("test-op")
+        try:
+            with self.assertRaises(RuntimeError):
+                self.pool._acquire_lock("another-op")
+        finally:
+            self.pool._release_lock()
+
+    def test_hash_directory_streams_large_file(self):
+        """hash_directory() handles files without loading entire content into memory."""
+        from skillpool_app.core import hash_directory
+        test_dir = self.temp_dir / "hash_test"
+        test_dir.mkdir()
+        # Write a 2MB file
+        big_file = test_dir / "big.bin"
+        big_file.write_bytes(b"x" * (2 * 1024 * 1024))
+        h = hash_directory(test_dir)
+        self.assertEqual(len(h), 64)  # SHA-256 hex digest
+        # Deterministic
+        self.assertEqual(h, hash_directory(test_dir))
+
 
 if __name__ == "__main__":
     unittest.main()
