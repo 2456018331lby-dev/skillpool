@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
 from typing import Optional
-import copy
 import json
 import os
 import secrets
@@ -16,7 +15,6 @@ from skillpool_app.core import (
     copy_existing_tree,
     ensure_clean_directory,
     load_json,
-    read_text,
     remove_path_lexists,
     safe_rmtree,
     utc_now,

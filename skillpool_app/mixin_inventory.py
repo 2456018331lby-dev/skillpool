@@ -2,13 +2,11 @@ from __future__ import annotations
 
 # Auto-extracted from core.py - do not edit directly.
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Optional
-import json
-import stat
 
 from skillpool_app.core import (
     REGISTRY_VERSION,
@@ -18,7 +16,6 @@ from skillpool_app.core import (
     load_json,
     parse_frontmatter,
     read_text,
-    scan_source_id,
     slugify,
     utc_now,
     write_json,

@@ -13,7 +13,6 @@ import subprocess
 
 from skillpool_app.core import (
     _powershell_command,
-    read_text,
 )
 
 class MixinConsole:

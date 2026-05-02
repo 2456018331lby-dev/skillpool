@@ -1,27 +1,27 @@
 from __future__ import annotations
 
-import ast
-import copy
-import difflib
+import ast  # noqa: F401  # re-exported for mixin_mcp
+import copy  # noqa: F401  # re-exported for mixin_state/mcp
+import difflib  # noqa: F401  # re-exported for mixin_inventory
 import hashlib
 import json
 import os
 import re
-import shlex
+import shlex  # noqa: F401  # re-exported for mixin_scan/console
 import shutil
 import socket
-import stat
-import subprocess
-import tempfile
+import stat  # noqa: F401  # re-exported for mixin_console
+import subprocess  # noqa: F401  # re-exported for mixin_console
+import tempfile  # noqa: F401  # re-exported for mixin_import
 import time
 import urllib.parse
 import urllib.request
-import zipfile
-import fcntl
-import secrets
+import zipfile  # noqa: F401  # re-exported for mixin_import
+import fcntl  # noqa: F401  # re-exported for mixin_state
+import secrets  # noqa: F401  # re-exported for mixin_publish
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple  # noqa: F401  # Iterable re-exported
 
 
 REGISTRY_VERSION = 1
@@ -384,14 +384,14 @@ def copy_existing_tree(source_dir: Path, destination_dir: Path) -> None:
 
 
 
-from skillpool_app.mixin_state import MixinState
-from skillpool_app.mixin_console import MixinConsole
-from skillpool_app.mixin_import import MixinImport
-from skillpool_app.mixin_scan import MixinScan
-from skillpool_app.mixin_mcp import MixinMcp
-from skillpool_app.mixin_sync import MixinSync
-from skillpool_app.mixin_publish import MixinPublish
-from skillpool_app.mixin_inventory import MixinInventory
+from skillpool_app.mixin_state import MixinState  # noqa: E402
+from skillpool_app.mixin_console import MixinConsole  # noqa: E402
+from skillpool_app.mixin_import import MixinImport  # noqa: E402
+from skillpool_app.mixin_scan import MixinScan  # noqa: E402
+from skillpool_app.mixin_mcp import MixinMcp  # noqa: E402
+from skillpool_app.mixin_sync import MixinSync  # noqa: E402
+from skillpool_app.mixin_publish import MixinPublish  # noqa: E402
+from skillpool_app.mixin_inventory import MixinInventory  # noqa: E402
 
 
 class SkillPool(

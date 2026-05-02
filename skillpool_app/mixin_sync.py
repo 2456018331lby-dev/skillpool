@@ -7,14 +7,12 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
-import copy
 import json
 import os
 import shutil
 
 from skillpool_app.core import (
     hash_directory,
-    read_text,
     utc_now,
     write_json,
 )

@@ -15,7 +15,6 @@ import re
 import secrets
 
 from skillpool_app.core import (
-    read_text,
     utc_now,
     write_json,
     yaml_scalar,

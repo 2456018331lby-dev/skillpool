@@ -18,12 +18,14 @@ import zipfile
 
 from skillpool_app.core import (
     ensure_clean_directory,
-    read_text,
 )
 
 class MixinImport:
     """Mixin: _github_request, _parse_github_locator, import_github, import_zip, import_detect_github..."""
 
+    _GITHUB_TRANSIENT_CODES = {429, 500, 502, 503, 504}
+
+    @staticmethod
     def _github_request(url: str, dest: Path, timeout: int = 30, max_retries: int = 3) -> None:
         """Download from a GitHub URL with auth token, timeout, and retry logic."""
         headers = {"User-Agent": "skillpool/0.1"}
@@ -49,7 +51,7 @@ class MixinImport:
                     time.sleep(wait)
                     backoff = min(backoff * 2, 8.0)
                     continue
-                if exc.code in SkillPool._GITHUB_TRANSIENT_CODES:
+                if exc.code in MixinImport._GITHUB_TRANSIENT_CODES:
                     time.sleep(backoff)
                     backoff = min(backoff * 2, 8.0)
                     continue
@@ -82,7 +84,6 @@ class MixinImport:
             owner, repo = parts[0], parts[1].replace(".git", "")
             tree_ref = ref
             tree_subdir = subdir
-        display = "https://github.com/{}/{}".format(owner, repo)
         return owner, repo, tree_ref, tree_subdir or ""
 
     def import_github(self, locator: str, ref: Optional[str] = None, subdir: Optional[str] = None) -> Dict[str, List[str]]:
